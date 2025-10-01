@@ -1,3 +1,4 @@
+
 body {
   margin: 0;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -40,13 +41,13 @@ body {
 
 .nav a {
   text-decoration: none;
-  color: #d63384;
+  color: #b7d9b1;
   font-weight: bold;
   transition: color 0.3s;
 }
 
 .nav a:hover {
-  color: #a10055;
+  color: #b7d9b1;
 }
 
 /* Sections */
@@ -65,6 +66,9 @@ form {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  max-width: 400px;
+  margin: 1rem auto;
+  text-align: left; /* <-- Wichtig! Buttons links ausrichten */
 }
 
 label {
@@ -95,12 +99,13 @@ fieldset {
   padding: 1rem 1.5rem;
   margin-bottom: 1rem;
   background-color: #fff8f5;
+  text-align: left; /* <-- Buttons links */
 }
 
 legend {
   font-weight: bold;
   padding: 0 0.5rem;
-  color: #d63384;
+  color: #b7d9b1;
 }
 
 input[type="checkbox"],
@@ -145,4 +150,11 @@ button:hover {
     flex-direction: column;
     gap: 1rem;
   }
+}
+
+.horizontal-label {
+  display: flex;
+  align-items: left; /* vertikal mittig zum Text */
+  gap: 0.5rem; /* Abstand Button ↔ Text */
+  margin-bottom: 0.3rem;
 }

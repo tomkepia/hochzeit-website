@@ -50,25 +50,18 @@ function RSVPForm() {
         </fieldset>
 
         {/* 4. Schlafplatz */}
-        <fieldset>
-          <legend>Schlafplatz</legend>
-          <p>
-            Wir haben vor allem Gemeinschaftszimmer mit gemeinschaftsbädern
-            (geschlechtergetrennt), Hotels in der Nähe und Fläche für Bullis/Wohnwagen.
-            Die Zimmeraufteilung wird von uns vorgenommen und dann mit euch abgestimmt.
-          </p>
-          <label>
-            <input type="radio" name="schlafplatz" value="hotel" />
-            Hotel
-          </label>
-          <label>
-            <input type="radio" name="schlafplatz" value="vor_ort" />
-            Vor Ort im Zimmer
-          </label>
-          <label>
-            <input type="radio" name="schlafplatz" value="camping" />
-            Camping/Bulli/Wohnwagen
-          </label>
+       <fieldset>
+        <legend>Schlafplatz</legend>
+        <p>Bitte wähle:</p>
+        <label className="horizontal-label">
+          <input type="radio" name="schlafplatz" value="hotel" /> Hotel
+        </label>
+        <label className="horizontal-label">
+          <input type="radio" name="schlafplatz" value="vor_ort" /> Vor Ort im Zimmer
+        </label>
+        <label className="horizontal-label">
+          <input type="radio" name="schlafplatz" value="camping" /> Camping/Bulli/Wohnwagen
+        </label>
         </fieldset>
 
         {/* 5. Mitbringen für Frühstück */}
