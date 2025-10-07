@@ -1,13 +1,14 @@
 import React from "react";
 
-function PhotoUploadSection() {
+
+export default function PhotoUploadSection() {
   return (
-    <section>
+
+      <div>
       <h2>Fotos hochladen</h2>
       <p>Hier könnt ihr später eure Fotos von der Hochzeit hochladen!</p>
       {/* Upload-Funktion wird später ergänzt */}
-    </section>
+      </div>
+
   );
 }
-
-export default PhotoUploadSection;

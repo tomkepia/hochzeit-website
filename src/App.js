@@ -3,12 +3,10 @@ import "./App.css";
 
 import InfoSection from "./components/InfoSection";
 import RSVPForm from "./components/RSVPForm";
-import PhotoUploadSection from "./components/PhotoUploadSection";
-import PasswordGate from "./components/PasswordGate";
 import Navbar from "./components/Navbar";
 import Hero from "./components/Hero";
-
-
+import PhotoUploadSection from "./components/PhotoUploadSection";
+import PasswordGate from "./components/PasswordGate";
 
 function App() {
   // Logout and session logic
@@ -54,15 +52,14 @@ function App() {
   return (
     <PasswordGate>
       <div className="App">
- 
 
         <main>
-          <Navbar id = "navbar"/>
-          <Hero  id = "hero"/>
-          
+          <Navbar id="navbar" />
+          <Hero id="hero" />
           <InfoSection id="info" />
           <RSVPForm id="rsvp" />
           <PhotoUploadSection id="photos" />
+          
           
         </main>
 
