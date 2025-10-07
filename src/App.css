@@ -1,190 +1,105 @@
-.add-person-btn {
-  background-color: #b7d9b1;
-  color: #333;
-  border: none;
-  border-radius: 8px;
-  padding: 0.5rem 1rem;
-  cursor: pointer;
-  font-weight: bold;
-  margin-top: 0.5rem;
-  transition: background-color 0.3s;
-}
-
-.add-person-btn:hover {
-  background-color: #8fc48a;
-}
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Montserrat:wght@300;500&display=swap');
 
 body {
   margin: 0;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: 'Montserrat', sans-serif;
   background-color: #f9f5f2;
   color: #333;
 }
 
-.App {
-  text-align: center;
-  padding-bottom: 3rem;
+h1, h2, h3, legend {
+  font-family: 'Playfair Display', serif;
 }
 
-/* Header */
-.header {
-  background-color: #f9f5f2;
-  color: black;
-  padding: 3rem 1rem;
-  font-size: 1.2rem;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-}
-
-.header h1 {
-  font-size: 2.5rem;
-  margin: 0.5rem 0;
-}
-
-.header p {
-  margin: 0;
-  font-weight: 500;
-}
-
-/* Navigation */
+/* NAVIGATION */
 .nav {
-  background-color: #f9f5f2;
-  padding: 1rem 0;
   display: flex;
-  justify-content: center;
-  gap: 2rem;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 3rem;
+  border-bottom: 1px solid #eee;
+  background: #fff;
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 
-.nav a {
+.nav-left {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.nav-right a {
+  margin-left: 2rem;
   text-decoration: none;
-  color: #b7d9b1;
-  font-weight: bold;
-  transition: color 0.3s;
-}
-
-.nav a:hover {
-  color: #b7d9b1;
-}
-
-/* Sections */
-section {
-  background-color: white;
-  margin: 2rem auto;
-  padding: 2rem;
-  border-radius: 12px;
-  max-width: 700px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-  text-align: left;
-}
-
-/* RSVP Form */
-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  max-width: 400px;
-  margin: 1rem auto;
-  text-align: left; /* <-- Wichtig! Buttons links ausrichten */
-}
-
-label {
-  display: flex;
-  font-weight: 500;
-}
-label_textbox {
-  display: flex;
-  flex-direction: column;
-  font-weight: 500;
-}
-
-input[type="text"],
-input[type="email"],
-select,
-textarea {
-  padding: 0.6rem 0.8rem;
-  border-radius: 8px;
-  border: 1px solid #ddd;
-  font-size: 1rem;
-  margin-top: 0.3rem;
-}
-
-textarea {
-  resize: vertical;
-  min-height: 60px;
-}
-
-fieldset {
-  border: 2px solid #e0d6d0;
-  border-radius: 10px;
-  padding: 1rem 1.5rem;
-  margin-bottom: 1rem;
-  background-color: #fff8f5;
-  text-align: left; /* <-- Buttons links */
-}
-
-legend {
-  font-weight: bold;
-  padding: 0 0.5rem;
-  color: #b7d9b1;
-}
-
-input[type="checkbox"],
-input[type="radio"] {
-  margin-right: 0.5rem;
-}
-
-/* Button */
-button {
-  padding: 0.5rem 1rem;
-  border-radius: 8px;
-  border: none;
-  font-weight: bold;
-  font-size: 1rem;
-  cursor: pointer;
-  background-color: #b7d9b1;
   color: #333;
-}
-
-.remove-person-btn {
-  color: #4cae4c !important;
-  background: #eee;
-  border: none;
-  border-radius: 8px;
-  padding: 0.5rem 1rem;
-  cursor: pointer;
-  font-weight: bold;
-  margin-top: 0.5rem;
-  transition: background-color 0.3s;
-}
-
-button:hover {
-  background-color: #8fc48a;
-}
-
-/* Footer */
-.footer {
-  background-color: #f9f5f2;
-  padding: 1rem;
-  margin-top: 3rem;
   font-weight: 500;
+}
+
+.nav-btn {
+  border: 1px solid #333;
+  padding: 0.4rem 0.8rem;
+  transition: all 0.3s;
+}
+
+.nav-btn:hover {
+  background: #333;
+  color: #fff;
+}
+
+/* HERO */
+.hero {
+  background-image: url("./photos/hochzeit.jpg"); /* Dein Bild */
+  background-size: cover;
+  background-position: center;
+  height: 80vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.hero-overlay {
+  background: rgba(255, 255, 255, 0.6);
+  padding: 2rem 3rem;
+  border-radius: 10px;
   text-align: center;
 }
 
-/* Responsive */
-@media (max-width: 768px) {
-  section {
-    margin: 1rem;
-    padding: 1.5rem;
-  }
-
-  .nav {
-    flex-direction: column;
-    gap: 1rem;
-  }
+.hero h1 {
+  font-size: 3rem;
+  margin: 0;
+  color: #333;
 }
 
-.horizontal-label {
-  display: flex;
-  align-items: left; /* vertikal mittig zum Text */
-  gap: 0.5rem; /* Abstand Button ↔ Text */
-  margin-bottom: 0.3rem;
+.hero p {
+  font-size: 1.3rem;
+  margin: 0.5rem 0 1.5rem;
+}
+
+.hero-btn {
+  padding: 0.7rem 1.5rem;
+  border: 2px solid #333;
+  text-decoration: none;
+  font-weight: bold;
+  background: #fff;
+  color: #333;
+  transition: all 0.3s;
+}
+
+.hero-btn:hover {
+  background: #333;
+  color: #fff;
+}
+
+/* SECTION */
+section {
+  background: #fff;
+  margin: 4rem auto;
+  padding: 2rem;
+  max-width: 700px;
+  border-radius: 10px;
+  text-align: center;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.05);
 }

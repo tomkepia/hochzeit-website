@@ -5,6 +5,10 @@ import InfoSection from "./components/InfoSection";
 import RSVPForm from "./components/RSVPForm";
 import PhotoUploadSection from "./components/PhotoUploadSection";
 import PasswordGate from "./components/PasswordGate";
+import Navbar from "./components/Navbar";
+import Hero from "./components/Hero";
+
+
 
 function App() {
   // Logout and session logic
@@ -50,21 +54,16 @@ function App() {
   return (
     <PasswordGate>
       <div className="App">
-        <header className="header">
-          <h1>Tomke & Jan-Paul ❤️</h1>
-          <p>Hochzeit: 09. Mai 2026</p>
-        </header>
-
-        <nav className="nav">
-          <a href="#info">Informationen</a>
-          <a href="#rsvp">Antwort</a>
-          <a href="#photos">Fotos</a>
-        </nav>
+ 
 
         <main>
+          <Navbar id = "navbar"/>
+          <Hero  id = "hero"/>
+          
           <InfoSection id="info" />
           <RSVPForm id="rsvp" />
           <PhotoUploadSection id="photos" />
+          
         </main>
 
         <button onClick={handleLogout} style={{position: 'fixed', top: 10, right: 10, zIndex: 1000}}>Logout</button>
