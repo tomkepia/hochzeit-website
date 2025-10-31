@@ -142,6 +142,7 @@ function RSVPForm() {
                   type="button"
                   className="remove-person-btn"
                   onClick={() => removePerson(idx)}
+                  style={{ marginTop: '0.8rem' }}
                 >
                   Entfernen
                 </button>
@@ -158,7 +159,7 @@ function RSVPForm() {
           <legend><Mail className="icon" /> Kontakt</legend>
           <label>
             Email-Adresse:
-            <input
+            <input 
               type="email"
               name="email"
               required

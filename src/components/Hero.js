@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 
 function Hero() {
-  const weddingDate = new Date("2026-05-09T14:00:00");
+  const weddingDate = new Date("2026-05-09T15:00:00");
   const [timeLeft, setTimeLeft] = useState(getTimeLeft());
 
   function getTimeLeft() {

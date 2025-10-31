@@ -13,7 +13,7 @@ function PhotoUploadSection() {
       >
         <h2> Fotos hochladen</h2>
       </motion.h2>
-      <form className="rsvp-form" style={{ marginTop: '2rem' }}>
+{/*       <form className="rsvp-form" style={{ marginTop: '2rem' }}>
         <fieldset className="form-box">
           <legend>Fotos auswählen</legend>
           <label style={{ display: 'block', marginBottom: '1rem' }}>
@@ -23,7 +23,7 @@ function PhotoUploadSection() {
             Hochladen (bald verfügbar)
           </button>
         </fieldset>
-      </form>
+      </form> */}
       <p style={{ color: '#6b5a45', marginTop: '2rem' }}>
         Hier könnt ihr später eure Fotos von der Hochzeit hochladen!
       </p>

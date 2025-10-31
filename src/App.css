@@ -1,6 +1,6 @@
 
 /* Ensure input and select fields in .person-block span full width */
-.person-block input,
+.person-block input, .form-box input,
 .person-block select {
   box-sizing: border-box;
 }
@@ -126,6 +126,15 @@ button.logout_button {
   background: #333;
   color: #fff;
 }
+
+.hero-image {
+  display: block;       /* entfernt inline Verhalten */
+  max-width: 100%;      /* Bild skaliert auf max Breite */
+  height: auto;         /* Höhe proportional */
+  margin: 0 auto;       /* zentriert horizontal */
+}
+
+
 
 /* === ALLGEMEINE SECTION STYLES === */
 section {
@@ -370,3 +379,52 @@ select {
   letter-spacing: 0.05em;
 }
 
+
+
+/*burger-btn*/
+
+.burger-btn {
+  display: none;  /* standardmäßig unsichtbar */
+  font-size: 1.5rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+/* Desktop-Navbar */
+.nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem; /* z.B. größere Höhe für Desktop */
+}
+
+/* Mobile Styles */
+@media (max-width: 768px) {
+
+  .burger-btn {
+    display: block;
+  }
+  .nav {
+    padding: 0.5rem 1rem; /* kleinere Höhe für mobile */
+  }
+
+  .nav-right {
+    position: absolute;
+    top: 50px; /* angepasst, passt zur mobilen Navbar-Höhe */
+    right: 0;
+    background-color: white;
+    flex-direction: column;
+    width: 200px;
+    padding: 1rem;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    display: none; /* initial versteckt */
+  }
+
+  .nav-right.open {
+    display: flex; /* sichtbar, wenn Burger gedrückt */
+  }
+
+  .nav-right button {
+    margin: 0.5rem 0;
+  }
+}
