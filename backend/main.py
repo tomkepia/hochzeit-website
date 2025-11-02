@@ -2,8 +2,8 @@ from fastapi import FastAPI, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
-from backend.database import init_db, SessionLocal
-from backend.models import Guest
+from database import init_db, SessionLocal
+from models import Guest
 
 app = FastAPI()
 

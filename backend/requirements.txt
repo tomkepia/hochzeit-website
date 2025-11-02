@@ -1,5 +1,6 @@
 fastapi
-uvicorn
+uvicorn[standard]
 sqlalchemy
-aiosqlite
+psycopg2-binary
 pydantic
+python-multipart
