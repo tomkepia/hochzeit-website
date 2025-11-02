@@ -1,16 +1,30 @@
 import React from "react";
 import "./App.css";
+import { useRef } from "react";
 
 import InfoSection from "./components/InfoSection";
 import RSVPForm from "./components/RSVPForm";
+import Navbar from "./components/Navbar";
+import Hero from "./components/Hero";
 import PhotoUploadSection from "./components/PhotoUploadSection";
 import PasswordGate from "./components/PasswordGate";
+import { LogOut} from "lucide-react";
+
+// Logout and session logic
+const AUTH_KEY = 'isAuthenticated';
+const SESSION_KEY = 'sessionStart';
+const SESSION_DURATION = 30 * 60 * 1000; // 30 minutes
 
 function App() {
-  // Logout and session logic
-  const AUTH_KEY = 'isAuthenticated';
-  const SESSION_KEY = 'sessionStart';
-  const SESSION_DURATION = 30 * 60 * 1000; // 30 minutes
+
+  const heroRef = useRef(null);
+  const infoRef = useRef(null);
+  const photosRef = useRef(null);
+  const rsvpRef = useRef(null);
+
+  const scrollToRef = (ref) => {
+    ref.current?.scrollIntoView({ behavior: "smooth" });
+  };
 
   React.useEffect(() => {
     if (localStorage.getItem(AUTH_KEY) === 'true') {
@@ -49,25 +63,23 @@ function App() {
 
   return (
     <PasswordGate>
-      <div className="App">
-        <header className="header">
-          <h1>Tomke & Jan-Paul ❤️</h1>
-          <p>Hochzeit: 09. Mai 2026</p>
-        </header>
+       <div className="App">
+      <Navbar
+        scrollTo={{
+          hero: () => scrollToRef(heroRef),
+          infos: () => scrollToRef(infoRef),
+          rsvp: () => scrollToRef(rsvpRef),
+          photos: () => scrollToRef(photosRef),
+          
+        }}
+        onLogout={handleLogout}
+      />
 
-        <nav className="nav">
-          <a href="#info">Informationen</a>
-          <a href="#rsvp">Antwort</a>
-          <a href="#photos">Fotos</a>
-        </nav>
-
-        <main>
-          <InfoSection id="info" />
-          <RSVPForm id="rsvp" />
-          <PhotoUploadSection id="photos" />
-        </main>
-
-        <button onClick={handleLogout} style={{position: 'fixed', top: 10, right: 10, zIndex: 1000}}>Logout</button>
+      <div ref={heroRef}><Hero /></div>
+      <div ref={infoRef}><InfoSection /></div>
+      <div ref={rsvpRef}><RSVPForm /></div>
+      <div ref={photosRef}><PhotoUploadSection /></div>
+      
 
         <footer className="footer">
           <p>© 2026 Tomke & Jan-Paul</p>
