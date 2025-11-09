@@ -84,7 +84,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Deploy to Hetzner VPS
+      - name: Deploy to Multi-App Server
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.HETZNER_HOST }}
@@ -103,24 +103,27 @@ jobs:
             docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
             docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:latest
 
-            # Stop current containers
-            docker-compose -f docker-compose.prod.yml down
+            # Stop current containers (using SHARED compose file for multi-app setup)
+            docker-compose -f docker-compose.prod-shared.yml down
 
             # Update environment variables
             cp .env.production .env
 
-            # Start new containers
-            docker-compose -f docker-compose.prod.yml up -d
+            # Start new containers (using SHARED compose file for multi-app setup)
+            docker-compose -f docker-compose.prod-shared.yml up -d
 
             # Clean up old images
             docker image prune -f
 
             # Check deployment status
             sleep 30
-            docker-compose -f docker-compose.prod.yml ps
+            docker-compose -f docker-compose.prod-shared.yml ps
 
-            # Health check
-            curl -f http://localhost/api/ || echo "Backend health check failed"
+            # Health check (using localhost:8001 for multi-app setup)
+            curl -f http://localhost:8001/ || echo "Backend health check failed"
+
+            # Reload nginx to ensure configuration is up to date
+            sudo systemctl reload nginx
 
   notify:
     needs: [test, build-and-deploy]
@@ -131,8 +134,8 @@ jobs:
       - name: Notify deployment status
         run: |
           if [ "${{ needs.build-and-deploy.result }}" == "success" ]; then
-            echo "✅ Deployment successful!"
+            echo "✅ Multi-app deployment successful!"
           else
-            echo "❌ Deployment failed!"
+            echo "❌ Multi-app deployment failed!"
             exit 1
           fi
