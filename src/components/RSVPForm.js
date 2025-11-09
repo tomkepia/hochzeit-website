@@ -3,7 +3,9 @@ import { motion } from "framer-motion";
 import { Users, Mail, BedDouble, CalendarHeart, Coffee } from "lucide-react";
 
 function RSVPForm() {
-  const [persons, setPersons] = useState([{ name: "", essen: "", dabei: null }]);
+  const [persons, setPersons] = useState([
+    { name: "", essen: "", dabei: null },
+  ]);
   const [email, setEmail] = useState("");
   const [anreise, setAnreise] = useState("");
   const [essen_fr, setEssenFr] = useState(false);
@@ -52,6 +54,9 @@ function RSVPForm() {
       unterkunft,
     };
 
+    // Use environment variable for API URL, fallback to localhost for development
+    const apiUrl = process.env.REACT_APP_API_URL || "http://localhost:8000";
+
     let allSuccess = true;
     for (const person of persons) {
       const guestData = {
@@ -61,7 +66,7 @@ function RSVPForm() {
         ...sharedFields,
       };
       try {
-        const res = await fetch("http://localhost:8000/rsvp", {
+        const res = await fetch(`${apiUrl}/rsvp`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(guestData),
@@ -87,7 +92,9 @@ function RSVPForm() {
       <form onSubmit={handleSubmit} className="rsvp-form">
         {/* Personen */}
         <fieldset className="form-box">
-          <legend><Users className="icon" /> Personen</legend>
+          <legend>
+            <Users className="icon" /> Personen
+          </legend>
           {persons.map((person, idx) => (
             <div key={idx} className="person-block">
               <label>
@@ -95,15 +102,19 @@ function RSVPForm() {
                 <input
                   type="text"
                   value={person.name}
-                  onChange={(e) => handlePersonChange(idx, "name", e.target.value)}
+                  onChange={(e) =>
+                    handlePersonChange(idx, "name", e.target.value)
+                  }
                   required
                 />
               </label>
-              <label style={{ marginTop: '0.7rem', display: 'block' }}>
+              <label style={{ marginTop: "0.7rem", display: "block" }}>
                 Essenswunsch:
                 <select
                   value={person.essen}
-                  onChange={(e) => handlePersonChange(idx, "essen", e.target.value)}
+                  onChange={(e) =>
+                    handlePersonChange(idx, "essen", e.target.value)
+                  }
                   required
                 >
                   <option value="">Bitte wählen</option>
@@ -121,7 +132,9 @@ function RSVPForm() {
                     name={`person_dabei_${idx}`}
                     value="ja"
                     checked={person.dabei === "ja"}
-                    onChange={(e) => handlePersonChange(idx, "dabei", e.target.value)}
+                    onChange={(e) =>
+                      handlePersonChange(idx, "dabei", e.target.value)
+                    }
                   />{" "}
                   Ja
                 </label>
@@ -131,7 +144,9 @@ function RSVPForm() {
                     name={`person_dabei_${idx}`}
                     value="nein"
                     checked={person.dabei === "nein"}
-                    onChange={(e) => handlePersonChange(idx, "dabei", e.target.value)}
+                    onChange={(e) =>
+                      handlePersonChange(idx, "dabei", e.target.value)
+                    }
                   />{" "}
                   Nein
                 </label>
@@ -142,7 +157,7 @@ function RSVPForm() {
                   type="button"
                   className="remove-person-btn"
                   onClick={() => removePerson(idx)}
-                  style={{ marginTop: '0.8rem' }}
+                  style={{ marginTop: "0.8rem" }}
                 >
                   Entfernen
                 </button>
@@ -156,10 +171,12 @@ function RSVPForm() {
 
         {/* Email */}
         <fieldset className="form-box">
-          <legend><Mail className="icon" /> Kontakt</legend>
+          <legend>
+            <Mail className="icon" /> Kontakt
+          </legend>
           <label>
             Email-Adresse:
-            <input 
+            <input
               type="email"
               name="email"
               required
@@ -171,7 +188,9 @@ function RSVPForm() {
 
         {/* Anreise */}
         <fieldset className="form-box">
-          <legend><CalendarHeart className="icon" /> Anreise</legend>
+          <legend>
+            <CalendarHeart className="icon" /> Anreise
+          </legend>
           <p className="question">Wann kommt ihr an?</p>
           <div className="radio-group">
             <label>
@@ -227,7 +246,9 @@ function RSVPForm() {
 
         {/* Unterkunft */}
         <fieldset className="form-box">
-          <legend><BedDouble className="icon" /> Übernachtung</legend>
+          <legend>
+            <BedDouble className="icon" /> Übernachtung
+          </legend>
           <div className="radio-group">
             <label>
               <input
@@ -272,7 +293,14 @@ function RSVPForm() {
           <div className="success-box">
             <h3>Vielen Dank für deine Rückmeldung! 💕</h3>
             <p>Deine Daten wurden erfolgreich gespeichert.</p>
-            <button onClick={() => { setSuccess(false); resetForm(); }}>Schließen</button>
+            <button
+              onClick={() => {
+                setSuccess(false);
+                resetForm();
+              }}
+            >
+              Schließen
+            </button>
           </div>
         </div>
       )}
