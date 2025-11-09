@@ -84,7 +84,7 @@ jobs:
             curl -f http://localhost:8001/ || echo "Backend health check failed"
 
             # Reload nginx to ensure configuration is up to date
-            sudo systemctl reload nginx
+            echo "${{ secrets.HETZNER_PASSWORD }}" | sudo -S systemctl reload nginx
 
   notify:
     needs: [test, build-and-deploy]
