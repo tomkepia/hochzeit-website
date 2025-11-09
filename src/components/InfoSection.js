@@ -15,19 +15,21 @@ function InfoSection() {
 
       <div className="info-card">
         <h3>Ort</h3>
-        <p>Farminn, Kakerbeck 9, 29378 Wittingen</p>
+        <p>FarmInn, Kakerbeck 9, 29378 Wittingen</p>
       </div>
     <div className="info-card">
         <h3>Die Location</h3>
         <p>
           Auf dem Gelände gibt es ca. 70 Schlafmöglichkeiten (meist Mehrbettzimmer).  
           Einige Zimmer mit eigenem Bad, sonst Gemeinschaftsbäder mit Duschkabinen. 
+          Die Preise der Zimmer schwanken je nach Größe ca. zwischen 42,5€ - 60€ pro Person/pro Nacht.
           Die Zimmeraufteilung übernehmen wir und besprechen diese dann natürlich mit euch. </p>
         <p> 
           Außerdem ist es möglich direkt auf dem Gelände mit einem Bulli oder Wohnwagen zu campen. 
           </p>
           <p>
-            Für Übernachtungen im Hotel in der Nähe können wir das Hotel "Zum Grünen Jäger" in Wittingen empfehlen.
+            Für Übernachtungen im Hotel in der Nähe können wir das Hotel "Bennetts Restaurant und Hotel" in Wittingen empfehlen.
+            Zusätzlich gibt es in der Umgebung einige Ferienwohnungen.
          </p>
          
       </div>
@@ -36,7 +38,7 @@ function InfoSection() {
         <p>
             <p>Wir wollen das ganze Wochenende mit euch feiern! Wenn ihr wollt, könnt ihr gerne schon am Freitag anreisen.</p>
           <strong>Freitag, 08. Mai:</strong> 
-          <p> ab 17 Uhr gemütliches Beisammensein & wir kümmern uns um ein einfaches Abendessen. Wir würden uns freuen, wenn ihr eure Lieblingsgetränke selber mitbringt. </p>
+          <p> ab 17 Uhr gemütliches Beisammensein & wir kümmern uns um ein einfaches Abendessen. Wir würden uns freuen, wenn ihr eure Lieblingsgetränke selber mitbringt.</p>
           <strong>Samstag, 09. Mai:</strong> 
           <p>10 Uhr: Gemeinsames Frühstück</p>
           <p>14 Uhr: Freie Trauung</p>
