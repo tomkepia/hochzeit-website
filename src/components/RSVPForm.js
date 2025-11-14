@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { motion } from "framer-motion";
-import { Users, Mail, BedDouble, CalendarHeart, Coffee } from "lucide-react";
+import { Users, Mail, BedDouble, CalendarHeart} from "lucide-react";
 
 function RSVPForm() {
   const [persons, setPersons] = useState([{ name: "", essen: "", dabei: null }]);
@@ -10,7 +10,6 @@ function RSVPForm() {
   const [essen_sa, setEssenSa] = useState(false);
   const [essen_so, setEssenSo] = useState(false);
   const [unterkunft, setUnterkunft] = useState("");
-  const [essen_mitbringsel, setEssenMitbringsel] = useState("");
   const [success, setSuccess] = useState(false);
 
   const handlePersonChange = (idx, field, value) => {
@@ -36,11 +35,10 @@ function RSVPForm() {
     setEssenSa(false);
     setEssenSo(false);
     setUnterkunft("");
-    setEssenMitbringsel("");
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+const handleSubmit = async (e) => {
+  e.preventDefault();
 
     const sharedFields = {
       email,
@@ -48,7 +46,6 @@ function RSVPForm() {
       essen_fr,
       essen_sa,
       essen_so,
-      essen_mitbringsel,
       unterkunft,
     };
 
@@ -81,7 +78,7 @@ function RSVPForm() {
         whileInView={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
       >
-        <h2>Deine Rückmeldung</h2>
+        Deine Rückmeldung
       </motion.h2>
 
       <form onSubmit={handleSubmit} className="rsvp-form">

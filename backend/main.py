@@ -42,7 +42,6 @@ class GuestCreate(BaseModel):
     essen_fr: bool | None = None
     essen_sa: bool | None = None
     essen_so: bool | None = None
-    essen_mitbringsel: str | None = None
     unterkunft: str | None = None
 
 # Endpoint to receive RSVP form data

@@ -15,5 +15,4 @@ class Guest(Base):
     essen_fr = Column(Boolean)
     essen_sa = Column(Boolean)
     essen_so = Column(Boolean)
-    essen_mitbringsel = Column(String)
     unterkunft = Column(String)

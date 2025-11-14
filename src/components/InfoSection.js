@@ -1,9 +1,16 @@
 import React from "react";
+import { motion } from "framer-motion";
 
 function InfoSection() {
   return (
     <section className="info-section">
-      <h2>Informationen zur Hochzeit</h2>
+      <motion.h2
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+      >
+        Informationen zur Hochzeit
+      </motion.h2>
       <p className="intro-text">
         Wir heiraten und freuen uns riesig, unseren besonderen Tag mit euch zu feiern!
       </p>

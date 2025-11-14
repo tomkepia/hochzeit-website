@@ -12,6 +12,7 @@
 /* === FONTS & BODY === */
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Montserrat:wght@300;500&display=swap');
 
+
 body {
   margin: 0;
   font-family: 'Montserrat', sans-serif;
@@ -427,4 +428,5 @@ select {
   .nav-right button {
     margin: 0.5rem 0;
   }
+
 }

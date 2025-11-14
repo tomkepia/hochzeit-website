@@ -11,7 +11,7 @@ function PhotoUploadSection() {
         whileInView={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
       >
-        <h2> Fotos hochladen</h2>
+        Fotos hochladen
       </motion.h2>
 {/*       <form className="rsvp-form" style={{ marginTop: '2rem' }}>
         <fieldset className="form-box">
