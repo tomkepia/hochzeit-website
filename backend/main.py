@@ -1,17 +1,26 @@
+import os
 from fastapi import FastAPI, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
-from backend.database import init_db, SessionLocal
-from backend.models import Guest
+from database import init_db, SessionLocal
+from models import Guest
 
-app = FastAPI()
+app = FastAPI(
+    title="Wedding Website API",
+    description="API for Tomke & Jan-Paul's Wedding Website",
+    version="1.0.0"
+)
+
+# Environment-based CORS configuration
+cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
+environment = os.getenv("ENVIRONMENT", "development")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Or specify your frontend URL
+    allow_origins=cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
@@ -22,7 +31,15 @@ def on_startup():
 
 @app.get("/")
 def read_root():
-    return {"message": "Backend is running!"}
+    return {
+        "message": "Wedding Website Backend is running!",
+        "environment": environment,
+        "version": "1.0.0"
+    }
+
+@app.get("/health")
+def health_check():
+    return {"status": "healthy", "environment": environment}
 
 # Dependency to get DB session
 def get_db():
