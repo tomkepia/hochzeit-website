@@ -51,8 +51,11 @@ const handleSubmit = async (e) => {
       unterkunft,
     };
 
-    // Use environment variable for API URL, fallback to localhost for development
-    const apiUrl = process.env.REACT_APP_API_URL || "http://localhost:8000";
+  // Use environment variable for API URL.
+  // In development you can set REACT_APP_API_URL=http://localhost:8000
+  // In production the frontend is served from the same origin and nginx proxies
+  // /api to the backend, so default to the proxied path '/api'.
+  const apiUrl = process.env.REACT_APP_API_URL || "/api";
 
     let allSuccess = true;
     for (const person of persons) {
