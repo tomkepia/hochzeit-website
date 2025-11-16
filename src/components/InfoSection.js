@@ -24,22 +24,7 @@ function InfoSection() {
         <h3>Ort</h3>
         <p>FarmInn, Kakerbeck 9, 29378 Wittingen</p>
       </div>
-    <div className="info-card">
-        <h3>Die Location</h3>
-        <p>
-          Auf dem Gelände gibt es ca. 70 Schlafmöglichkeiten (meist Mehrbettzimmer).  
-          Einige Zimmer mit eigenem Bad, sonst Gemeinschaftsbäder mit Duschkabinen. 
-          Die Preise der Zimmer schwanken je nach Größe ca. zwischen 42,5€ - 60€ pro Person/pro Nacht.
-          Die Zimmeraufteilung übernehmen wir und besprechen diese dann natürlich mit euch. </p>
-        <p> 
-          Außerdem ist es möglich direkt auf dem Gelände mit einem Bulli oder Wohnwagen zu campen. 
-          </p>
-          <p>
-            Für Übernachtungen im Hotel in der Nähe können wir das Hotel "Bennetts Restaurant und Hotel" in Wittingen empfehlen.
-            Zusätzlich gibt es in der Umgebung einige Ferienwohnungen.
-         </p>
-         
-      </div>
+
       <div className="info-card">
         <h3>Ablauf</h3>
         <p>
@@ -57,6 +42,22 @@ function InfoSection() {
         </p>
       </div>
 
+    <div className="info-card">
+        <h3>Location</h3>
+        <p>
+          Auf dem Gelände gibt es ca. 70 Schlafmöglichkeiten (meist Mehrbettzimmer).  
+          Einige Zimmer mit eigenem Bad, sonst Gemeinschaftsbäder mit Duschkabinen. 
+          Die Preise der Zimmer schwanken je nach Größe ca. zwischen 42,5€ - 60€ pro Person/pro Nacht.
+          Die Zimmeraufteilung übernehmen wir und besprechen diese dann natürlich mit euch. Die Bezahlung erfolgt über uns. </p>
+        <p> 
+          Außerdem ist es möglich direkt auf dem Gelände mit einem Bulli oder Wohnwagen zu campen. (25 € pro Nacht) 
+          </p>
+          <p>
+            Für Übernachtungen im Hotel in der Nähe können wir das Hotel "Bennetts Restaurant und Hotel" und "Wittinger Hof" in Wittingen empfehlen.
+            Zusätzlich gibt es in der Umgebung einige Ferienwohnungen.
+         </p>
+         
+      </div>
      
         <div className="info-card">
         <h3>Dresscode</h3>
