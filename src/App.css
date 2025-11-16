@@ -429,4 +429,23 @@ select {
     margin: 0.5rem 0;
   }
 
+  /* Mobile countdown adjustments */
+  .countdown-floating {
+    gap: 0.9rem; /* reduced gap from 1.2rem */
+    bottom: -37px; /* adjusted for smaller circle size (half of 75px) */
+  }
+
+  .countdown-circle {
+    width: 75px; /* reduced from 90px */
+    height: 75px; /* reduced from 90px */
+  }
+
+  .countdown-circle .number {
+    font-size: 1.2rem; /* reduced from 1.6rem */
+  }
+
+  .countdown-circle .label {
+    font-size: 0.65rem; /* reduced from 0.8rem */
+  }
+
 }
