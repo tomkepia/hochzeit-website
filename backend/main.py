@@ -70,4 +70,10 @@ def create_guest(guest: GuestCreate, db: Session = Depends(get_db)):
     db.refresh(db_guest)
     return {"success": True, "id": db_guest.id}
 
+# Admin endpoint to get all guests
+@app.get("/admin/guests")
+def get_all_guests(db: Session = Depends(get_db)):
+    guests = db.query(Guest).all()
+    return guests
+
 # You can add more endpoints here, e.g. for form submission
