@@ -268,7 +268,7 @@ const handleSubmit = async (e) => {
                 checked={unterkunft === "vor_ort"}
                 onChange={(e) => setUnterkunft(e.target.value)}
               />{" "}
-              Zimmer vor Ort
+              Zimmer in unserer Location
             </label>
             <label>
               <input
