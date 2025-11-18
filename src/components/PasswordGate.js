@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const PASSWORD = 't&j'; // Change this to your desired password
+const PASSWORD = 'Tomke&Jan-Paul2026'; // Change this to your desired password
 const AUTH_KEY = 'isAuthenticated';
 
 export default function PasswordGate({ children }) {
