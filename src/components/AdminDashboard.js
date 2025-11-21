@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LogOut, Users, Search, X } from 'lucide-react';
+import { LogOut, Users, Search, X, Download } from 'lucide-react';
 import GuestTable from './GuestTable';
 
 const ADMIN_AUTH_KEY = 'adminAuthenticated';
@@ -46,6 +46,87 @@ function AdminDashboard() {
     }
   };
 
+  const handleDeleteGuest = async (guestId, guestName) => {
+    const confirmed = window.confirm(
+      `Möchten Sie den Gast "${guestName}" wirklich löschen?\n\nDieser Vorgang kann nicht rückgängig gemacht werden.`
+    );
+    
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/admin/guests/${guestId}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        throw new Error('Fehler beim Löschen des Gastes');
+      }
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        // Refresh the guest list
+        await fetchGuests();
+      } else {
+        throw new Error(result.error || 'Fehler beim Löschen des Gastes');
+      }
+    } catch (err) {
+      alert(`Fehler: ${err.message}`);
+    }
+  };
+
+  const handleUpdateGuest = async (guestId, updatedData) => {
+    try {
+      const response = await fetch(`/api/admin/guests/${guestId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updatedData),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Fehler beim Aktualisieren des Gastes');
+      }
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        // Refresh the guest list
+        await fetchGuests();
+        return true;
+      } else {
+        throw new Error(result.error || 'Fehler beim Aktualisieren des Gastes');
+      }
+    } catch (err) {
+      alert(`Fehler: ${err.message}`);
+      return false;
+    }
+  };
+
+  const handleDownloadExcel = async () => {
+    try {
+      const response = await fetch('/api/admin/guests/export');
+      if (!response.ok) {
+        throw new Error('Fehler beim Exportieren der Daten');
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'gaeste.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err) {
+      alert(`Fehler: ${err.message}`);
+    }
+  };
+
   const handleLogout = () => {
     localStorage.removeItem(ADMIN_AUTH_KEY);
     localStorage.removeItem(ADMIN_SESSION_KEY);
@@ -86,24 +167,44 @@ function AdminDashboard() {
             Hochzeit Tomke & Jan-Paul - Gästeübersicht
           </p>
         </div>
-        <button
-          onClick={handleLogout}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '10px 16px',
-            backgroundColor: '#dc3545',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '14px'
-          }}
-        >
-          <LogOut size={16} />
-          Logout
-        </button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button
+            onClick={handleDownloadExcel}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 16px',
+              backgroundColor: '#28a745',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '14px'
+            }}
+          >
+            <Download size={16} />
+            Excel Download
+          </button>
+          <button
+            onClick={handleLogout}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 16px',
+              backgroundColor: '#dc3545',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '14px'
+            }}
+          >
+            <LogOut size={16} />
+            Logout
+          </button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -240,6 +341,8 @@ function AdminDashboard() {
             <GuestTable 
               guests={filteredGuests} 
               searchTerm={searchTerm}
+              onDeleteGuest={handleDeleteGuest}
+              onUpdateGuest={handleUpdateGuest}
             />
           )}
         </div>
