@@ -77,6 +77,35 @@ function AdminDashboard() {
     }
   };
 
+  const handleUpdateGuest = async (guestId, updatedData) => {
+    try {
+      const response = await fetch(`/api/admin/guests/${guestId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updatedData),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Fehler beim Aktualisieren des Gastes');
+      }
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        // Refresh the guest list
+        await fetchGuests();
+        return true;
+      } else {
+        throw new Error(result.error || 'Fehler beim Aktualisieren des Gastes');
+      }
+    } catch (err) {
+      alert(`Fehler: ${err.message}`);
+      return false;
+    }
+  };
+
   const handleLogout = () => {
     localStorage.removeItem(ADMIN_AUTH_KEY);
     localStorage.removeItem(ADMIN_SESSION_KEY);
@@ -272,6 +301,7 @@ function AdminDashboard() {
               guests={filteredGuests} 
               searchTerm={searchTerm}
               onDeleteGuest={handleDeleteGuest}
+              onUpdateGuest={handleUpdateGuest}
             />
           )}
         </div>

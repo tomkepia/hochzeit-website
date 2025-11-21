@@ -87,4 +87,19 @@ def delete_guest(guest_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"success": True, "message": "Guest deleted successfully"}
 
+# Admin endpoint to update a guest
+@app.put("/admin/guests/{guest_id}")
+def update_guest(guest_id: int, guest: GuestCreate, db: Session = Depends(get_db)):
+    db_guest = db.query(Guest).filter(Guest.id == guest_id).first()
+    if db_guest is None:
+        return {"success": False, "error": "Guest not found"}
+    
+    # Update guest fields
+    for key, value in guest.dict().items():
+        setattr(db_guest, key, value)
+    
+    db.commit()
+    db.refresh(db_guest)
+    return {"success": True, "guest": db_guest}
+
 # You can add more endpoints here, e.g. for form submission
