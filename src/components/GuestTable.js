@@ -1,7 +1,7 @@
 import React from 'react';
-import { Check, X, Clock, Mail, Car, Utensils, Bed } from 'lucide-react';
+import { Check, X, Clock, Mail, Car, Utensils, Bed, Trash2 } from 'lucide-react';
 
-function GuestTable({ guests, searchTerm }) {
+function GuestTable({ guests, searchTerm, onDeleteGuest }) {
   const highlightText = (text, search) => {
     if (!search || !text) return text;
     
@@ -79,6 +79,9 @@ function GuestTable({ guests, searchTerm }) {
               <Bed size={16} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
               Unterkunft
             </th>
+            <th style={{ padding: '12px 8px', textAlign: 'center', borderBottom: '2px solid #dee2e6', fontWeight: '600' }}>
+              Aktionen
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -113,6 +116,33 @@ function GuestTable({ guests, searchTerm }) {
               </td>
               <td style={{ padding: '12px 8px', fontSize: '14px' }}>
                 {guest.unterkunft || '-'}
+              </td>
+              <td style={{ padding: '12px 8px', textAlign: 'center' }}>
+                <button
+                  onClick={() => onDeleteGuest(guest.id, guest.name)}
+                  style={{
+                    background: 'none',
+                    border: '1px solid #dc3545',
+                    borderRadius: '4px',
+                    padding: '6px 8px',
+                    cursor: 'pointer',
+                    color: '#dc3545',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#dc3545';
+                    e.currentTarget.style.color = 'white';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = '#dc3545';
+                  }}
+                  title="Gast löschen"
+                >
+                  <Trash2 size={16} />
+                </button>
               </td>
             </tr>
           ))}

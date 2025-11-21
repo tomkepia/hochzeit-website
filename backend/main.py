@@ -76,4 +76,15 @@ def get_all_guests(db: Session = Depends(get_db)):
     guests = db.query(Guest).all()
     return guests
 
+# Admin endpoint to delete a guest
+@app.delete("/admin/guests/{guest_id}")
+def delete_guest(guest_id: int, db: Session = Depends(get_db)):
+    guest = db.query(Guest).filter(Guest.id == guest_id).first()
+    if guest is None:
+        return {"success": False, "error": "Guest not found"}
+    
+    db.delete(guest)
+    db.commit()
+    return {"success": True, "message": "Guest deleted successfully"}
+
 # You can add more endpoints here, e.g. for form submission
