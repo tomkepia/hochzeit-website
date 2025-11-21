@@ -1,10 +1,13 @@
 import os
 from fastapi import FastAPI, Depends
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
 from database import init_db, SessionLocal
 from models import Guest
+from openpyxl import Workbook
+from io import BytesIO
 
 app = FastAPI(
     title="Wedding Website API",
@@ -101,5 +104,49 @@ def update_guest(guest_id: int, guest: GuestCreate, db: Session = Depends(get_db
     db.commit()
     db.refresh(db_guest)
     return {"success": True, "guest": db_guest}
+
+# Admin endpoint to export guests as Excel
+@app.get("/admin/guests/export")
+def export_guests(db: Session = Depends(get_db)):
+    guests = db.query(Guest).all()
+    
+    # Create workbook and worksheet
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Gäste"
+    
+    # Add headers
+    headers = ["ID", "Name", "Essenswunsch", "Dabei", "Email", "Anreise", 
+               "Essen Fr", "Essen Sa", "Essen So", "Unterkunft"]
+    ws.append(headers)
+    
+    # Add data
+    for guest in guests:
+        dabei_text = "Ja" if guest.dabei is True else "Nein" if guest.dabei is False else "Ausstehend"
+        row = [
+            guest.id,
+            guest.name,
+            guest.essenswunsch or "",
+            dabei_text,
+            guest.email or "",
+            guest.anreise or "",
+            "Ja" if guest.essen_fr else "Nein",
+            "Ja" if guest.essen_sa else "Nein",
+            "Ja" if guest.essen_so else "Nein",
+            guest.unterkunft or ""
+        ]
+        ws.append(row)
+    
+    # Save to BytesIO
+    excel_file = BytesIO()
+    wb.save(excel_file)
+    excel_file.seek(0)
+    
+    # Return as streaming response
+    return StreamingResponse(
+        excel_file,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=gaeste.xlsx"}
+    )
 
 # You can add more endpoints here, e.g. for form submission

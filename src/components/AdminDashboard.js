@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LogOut, Users, Search, X } from 'lucide-react';
+import { LogOut, Users, Search, X, Download } from 'lucide-react';
 import GuestTable from './GuestTable';
 
 const ADMIN_AUTH_KEY = 'adminAuthenticated';
@@ -106,6 +106,27 @@ function AdminDashboard() {
     }
   };
 
+  const handleDownloadExcel = async () => {
+    try {
+      const response = await fetch('/api/admin/guests/export');
+      if (!response.ok) {
+        throw new Error('Fehler beim Exportieren der Daten');
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'gaeste.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err) {
+      alert(`Fehler: ${err.message}`);
+    }
+  };
+
   const handleLogout = () => {
     localStorage.removeItem(ADMIN_AUTH_KEY);
     localStorage.removeItem(ADMIN_SESSION_KEY);
@@ -146,24 +167,44 @@ function AdminDashboard() {
             Hochzeit Tomke & Jan-Paul - Gästeübersicht
           </p>
         </div>
-        <button
-          onClick={handleLogout}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '10px 16px',
-            backgroundColor: '#dc3545',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '14px'
-          }}
-        >
-          <LogOut size={16} />
-          Logout
-        </button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button
+            onClick={handleDownloadExcel}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 16px',
+              backgroundColor: '#28a745',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '14px'
+            }}
+          >
+            <Download size={16} />
+            Excel Download
+          </button>
+          <button
+            onClick={handleLogout}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 16px',
+              backgroundColor: '#dc3545',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '14px'
+            }}
+          >
+            <LogOut size={16} />
+            Logout
+          </button>
+        </div>
       </div>
 
       {/* Stats Cards */}
