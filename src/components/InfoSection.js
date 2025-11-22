@@ -28,7 +28,7 @@ function InfoSection() {
       <div className="info-card">
         <h3>Ablauf</h3>
         <p>
-            <p>Wir wollen das ganze Wochenende mit euch feiern! Wenn ihr wollt, könnt ihr gerne schon am Freitag anreisen.</p>
+            <p>Wir wollen das ganze Wochenende mit euch feiern! Deshalb könnt ihr gerne schon am Freitag anreisen, wenn ihr möchtet. Außerdem organisieren wir am Samstag und Sonntag ein gemeinsames Frühstück, sowohl für alle, die direkt in der Location übernachten, als auch für diejenigen, die im Hotel übernachten und trotzdem gern dazukommen möchten.</p>
           <strong>Freitag, 08. Mai:</strong> 
           <p> ab 17 Uhr gemütliches Beisammensein & wir kümmern uns um ein einfaches Abendessen. Wir würden uns freuen, wenn ihr eure Lieblingsgetränke selber mitbringt.</p>
           <strong>Samstag, 09. Mai:</strong> 
@@ -50,7 +50,7 @@ function InfoSection() {
           Die Preise der Zimmer schwanken je nach Größe ca. zwischen 42,5€ - 60€ pro Person/pro Nacht.
           Die Zimmeraufteilung übernehmen wir und besprechen diese dann natürlich mit euch. Die Bezahlung erfolgt über uns. </p>
         <p> 
-          Außerdem ist es möglich direkt auf dem Gelände mit einem Bulli oder Wohnwagen zu campen. (25 € pro Nacht) 
+          Außerdem ist es möglich direkt auf dem Gelände mit einem Bulli oder Wohnwagen zu campen (25 € pro Nacht).
           </p>
           <p>
             Für Übernachtungen im Hotel in der Nähe können wir das Hotel "Bennetts Restaurant und Hotel" und "Wittinger Hof" in Wittingen empfehlen.
