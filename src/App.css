@@ -1,3 +1,37 @@
+/* Horizontally scrollable KPI cards for mobile */
+
+.kpi-scroll-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-bottom: 20px;
+  scrollbar-width: thin;
+}
+
+.kpi-scroll-container > div {
+  min-width: 160px;
+  flex: 1 1 180px;
+  transition: box-shadow 0.2s;
+}
+
+@media (max-width: 600px) {
+  .kpi-scroll-container {
+    display: flex !important;
+    flex-wrap: nowrap;
+    gap: 10px;
+    padding-bottom: 8px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .kpi-scroll-container > div {
+    min-width: 140px;
+    max-width: 70vw;
+    font-size: 1.1em;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    padding: 12px 8px;
+    flex: 0 0 auto;
+  }
+}
 
 /* Ensure input and select fields in .person-block span full width */
 .person-block input, .form-box input,
@@ -45,7 +79,7 @@ h1, h2, h3, legend {
 /* Tomke & Jan-Paul in TAN Mon Cheri font */
 .tan-mon-cheri {
   src: url('./fonts/tan-mon-cheri.ttf') format('truetype');
-  #font-family: 'TAN Mon Cheri', ;
+  font-family: 'TAN Mon Cheri', ;
   font-size: 2rem;
   text-transform: uppercase;
   letter-spacing: 0.3em;

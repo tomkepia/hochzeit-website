@@ -6,6 +6,19 @@ const ADMIN_AUTH_KEY = 'adminAuthenticated';
 const ADMIN_SESSION_KEY = 'adminSessionStart';
 
 function AdminDashboard() {
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newGuest, setNewGuest] = useState({
+    name: '',
+    essenswunsch: '',
+    dabei: null,
+    email: '',
+    anreise: '',
+    essen_fr: false,
+    essen_sa: false,
+    essen_so: false,
+    unterkunft: '',
+  });
+  const [addError, setAddError] = useState('');
   const [guests, setGuests] = useState([]);
   const [filteredGuests, setFilteredGuests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -139,7 +152,19 @@ function AdminDashboard() {
 
   const attendingCount = guests.filter(guest => guest.dabei === true).length;
   const notAttendingCount = guests.filter(guest => guest.dabei === false).length;
-  const pendingCount = guests.filter(guest => guest.dabei === null || guest.dabei === undefined).length;
+
+
+  // Anreise KPIs
+  const arrivalFriday = guests.filter(g => g.anreise === 'freitag').length;
+  const arrivalSaturday = guests.filter(g => g.anreise === 'samstag').length;
+  const sleepVorOrt = guests.filter(g => g.unterkunft === 'vor_ort').length;
+  const sleepHotel = guests.filter(g => g.unterkunft === 'hotel').length;
+  const sleepWohnwagen = guests.filter(g => g.unterkunft === 'camping').length;
+
+  // Food Participation KPIs
+  const foodFriday = guests.filter(g => g.essen_fr === true).length;
+  const foodSaturday = guests.filter(g => g.essen_sa === true).length;
+  const foodSunday = guests.filter(g => g.essen_so === true).length;
 
   return (
     <div style={{ 
@@ -168,6 +193,114 @@ function AdminDashboard() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
+          <button
+            onClick={() => setShowAddModal(true)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 16px',
+              backgroundColor: '#007cba',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '14px',
+            }}
+          >
+            + Neuen Gast hinzufügen
+          </button>
+      {/* Add Guest Modal */}
+      {showAddModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+          background: 'rgba(0,0,0,0.3)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }}>
+          <div style={{ background: 'white', borderRadius: 8, padding: 24, minWidth: 320, maxWidth: 400, boxShadow: '0 4px 24px rgba(0,0,0,0.15)' }}>
+            <h2>Neuen Gast hinzufügen</h2>
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              setAddError('');
+              try {
+                const response = await fetch('/api/rsvp', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(newGuest),
+                });
+                if (!response.ok) throw new Error('Fehler beim Hinzufügen');
+                setShowAddModal(false);
+                setNewGuest({ name: '', essenswunsch: '', dabei: null, email: '', anreise: '', essen_fr: false, essen_sa: false, essen_so: false, unterkunft: '' });
+                await fetchGuests();
+              } catch (err) {
+                setAddError(err.message);
+              }
+            }}>
+              <div style={{ marginBottom: 12 }}>
+                <label>Name:<br/>
+                  <input required type="text" value={newGuest.name} onChange={e => setNewGuest({ ...newGuest, name: e.target.value })} style={{ width: '100%' }} />
+                </label>
+              </div>
+              <div style={{ marginBottom: 12 }}>
+                <label>Essenswunsch:<br/>
+                  <select required value={newGuest.essenswunsch} onChange={e => setNewGuest({ ...newGuest, essenswunsch: e.target.value })} style={{ width: '100%' }}>
+                    <option value="">Bitte wählen</option>
+                    <option value="Vegan">Vegan</option>
+                    <option value="Vegetarisch">Vegetarisch</option>
+                    <option value="Egal">Egal</option>
+                  </select>
+                </label>
+              </div>
+              <div style={{ marginBottom: 12 }}>
+                <label>Status:<br/>
+                  <select required value={newGuest.dabei === null ? '' : newGuest.dabei ? 'ja' : 'nein'} onChange={e => setNewGuest({ ...newGuest, dabei: e.target.value === '' ? null : e.target.value === 'ja' })} style={{ width: '100%' }}>
+                    <option value="">Ausstehend</option>
+                    <option value="ja">Kommt</option>
+                    <option value="nein">Kommt nicht</option>
+                  </select>
+                </label>
+              </div>
+              <div style={{ marginBottom: 12 }}>
+                <label>Email:<br/>
+                  <input required type="email" value={newGuest.email} onChange={e => setNewGuest({ ...newGuest, email: e.target.value })} style={{ width: '100%' }} />
+                </label>
+              </div>
+              <div style={{ marginBottom: 12 }}>
+                <label>Anreise:<br/>
+                  <select required value={newGuest.anreise} onChange={e => setNewGuest({ ...newGuest, anreise: e.target.value })} style={{ width: '100%' }}>
+                    <option value="">Bitte wählen</option>
+                    <option value="freitag">Freitag</option>
+                    <option value="samstag">Samstag</option>
+                  </select>
+                </label>
+              </div>
+              <div style={{ marginBottom: 12 }}>
+                <label>Verpflegung:<br/>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <label><input type="checkbox" checked={newGuest.essen_fr} onChange={e => setNewGuest({ ...newGuest, essen_fr: e.target.checked })} /> Freitag Abendessen</label>
+                    <label><input type="checkbox" checked={newGuest.essen_sa} onChange={e => setNewGuest({ ...newGuest, essen_sa: e.target.checked })} /> Samstag Frühstück</label>
+                    <label><input type="checkbox" checked={newGuest.essen_so} onChange={e => setNewGuest({ ...newGuest, essen_so: e.target.checked })} /> Sonntag Frühstück</label>
+                  </div>
+                </label>
+              </div>
+              <div style={{ marginBottom: 12 }}>
+                <label>Unterkunft:<br/>
+                  <select required value={newGuest.unterkunft} onChange={e => setNewGuest({ ...newGuest, unterkunft: e.target.value })} style={{ width: '100%' }}>
+                    <option value="">Bitte wählen</option>
+                    <option value="hotel">Hotel</option>
+                    <option value="vor_ort">Zimmer in unserer Location</option>
+                    <option value="camping">Bulli oder Wohnwagen</option>
+                  </select>
+                </label>
+              </div>
+              {addError && <div style={{ color: 'red', marginBottom: 8 }}>{addError}</div>}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                <button type="button" onClick={() => setShowAddModal(false)} style={{ background: '#eee', border: 'none', borderRadius: 4, padding: '8px 16px', cursor: 'pointer' }}>Abbrechen</button>
+                <button type="submit" style={{ background: '#28a745', color: 'white', border: 'none', borderRadius: 4, padding: '8px 16px', cursor: 'pointer' }}>Speichern</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
           <button
             onClick={handleDownloadExcel}
             style={{
@@ -208,59 +341,64 @@ function AdminDashboard() {
       </div>
 
       {/* Stats Cards */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '20px',
-        marginBottom: '20px'
-      }}>
-        <div style={{
-          backgroundColor: 'white',
-          padding: '20px',
-          borderRadius: '8px',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-          textAlign: 'center'
-        }}>
+      <div
+        className="kpi-scroll-container"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: '20px',
+          marginBottom: '20px',
+        }}
+      >
+
+        {/* Attendance KPIs */}
+        <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', textAlign: 'center' }}>
           <h3 style={{ margin: '0 0 10px 0', color: '#28a745' }}>Zusagen</h3>
-          <p style={{ fontSize: '24px', fontWeight: 'bold', margin: '0', color: '#28a745' }}>
-            {attendingCount}
-          </p>
+          <p style={{ fontSize: '24px', fontWeight: 'bold', margin: '0', color: '#28a745' }}>{attendingCount}</p>
         </div>
-        <div style={{
-          backgroundColor: 'white',
-          padding: '20px',
-          borderRadius: '8px',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-          textAlign: 'center'
-        }}>
+        <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', textAlign: 'center' }}>
           <h3 style={{ margin: '0 0 10px 0', color: '#dc3545' }}>Absagen</h3>
-          <p style={{ fontSize: '24px', fontWeight: 'bold', margin: '0', color: '#dc3545' }}>
-            {notAttendingCount}
-          </p>
+          <p style={{ fontSize: '24px', fontWeight: 'bold', margin: '0', color: '#dc3545' }}>{notAttendingCount}</p>
         </div>
-        <div style={{
-          backgroundColor: 'white',
-          padding: '20px',
-          borderRadius: '8px',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-          textAlign: 'center'
-        }}>
-          <h3 style={{ margin: '0 0 10px 0', color: '#ffc107' }}>Ausstehend</h3>
-          <p style={{ fontSize: '24px', fontWeight: 'bold', margin: '0', color: '#ffc107' }}>
-            {pendingCount}
-          </p>
-        </div>
-        <div style={{
-          backgroundColor: 'white',
-          padding: '20px',
-          borderRadius: '8px',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-          textAlign: 'center'
-        }}>
+        <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', textAlign: 'center' }}>
           <h3 style={{ margin: '0 0 10px 0', color: '#007cba' }}>Gesamt</h3>
-          <p style={{ fontSize: '24px', fontWeight: 'bold', margin: '0', color: '#007cba' }}>
-            {guests.length}
-          </p>
+          <p style={{ fontSize: '24px', fontWeight: 'bold', margin: '0', color: '#007cba' }}>{guests.length}</p>
+        </div>
+
+        {/* Anreise KPIs */}
+        <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', textAlign: 'center' }}>
+          <h3 style={{ margin: '0 0 10px 0', color: '#007cba' }}>Anreise Freitag</h3>
+          <p style={{ fontSize: '24px', fontWeight: 'bold', margin: '0', color: '#007cba' }}>{arrivalFriday}</p>
+        </div>
+        <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', textAlign: 'center' }}>
+          <h3 style={{ margin: '0 0 10px 0', color: '#007cba' }}>Anreise Samstag</h3>
+          <p style={{ fontSize: '24px', fontWeight: 'bold', margin: '0', color: '#007cba' }}>{arrivalSaturday}</p>
+        </div>
+        <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', textAlign: 'center' }}>
+          <h3 style={{ margin: '0 0 10px 0', color: '#795548' }}>Schlafen vor Ort</h3>
+          <p style={{ fontSize: '24px', fontWeight: 'bold', margin: '0', color: '#795548' }}>{sleepVorOrt}</p>
+        </div>
+        <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', textAlign: 'center' }}>
+          <h3 style={{ margin: '0 0 10px 0', color: '#607d8b' }}>Hotel</h3>
+          <p style={{ fontSize: '24px', fontWeight: 'bold', margin: '0', color: '#607d8b' }}>{sleepHotel}</p>
+        </div>
+        <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', textAlign: 'center' }}>
+          <h3 style={{ margin: '0 0 10px 0', color: '#388e3c' }}>Wohnwagen</h3>
+          <p style={{ fontSize: '24px', fontWeight: 'bold', margin: '0', color: '#388e3c' }}>{sleepWohnwagen}</p>
+        </div>
+
+        {/* Food Participation KPIs */}
+        <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', textAlign: 'center' }}>
+          <h3 style={{ margin: '0 0 10px 0', color: '#ff9800' }}>Essen Freitag</h3>
+          <p style={{ fontSize: '24px', fontWeight: 'bold', margin: '0', color: '#ff9800' }}>{foodFriday}</p>
+        </div>
+        <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', textAlign: 'center' }}>
+          <h3 style={{ margin: '0 0 10px 0', color: '#ff9800' }}>Essen Samstag</h3>
+          <p style={{ fontSize: '24px', fontWeight: 'bold', margin: '0', color: '#ff9800' }}>{foodSaturday}</p>
+        </div>
+        <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', textAlign: 'center' }}>
+          <h3 style={{ margin: '0 0 10px 0', color: '#ff9800' }}>Essen Sonntag</h3>
+          <p style={{ fontSize: '24px', fontWeight: 'bold', margin: '0', color: '#ff9800' }}>{foodSunday}</p>
         </div>
       </div>
 
