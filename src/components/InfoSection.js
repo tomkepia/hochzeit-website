@@ -28,7 +28,7 @@ function InfoSection() {
       <div className="info-card">
         <h3>Ablauf</h3>
         <p>
-            <p>Wir wollen das ganze Wochenende mit euch feiern! Deshalb könnt ihr gerne schon am Freitag anreisen, wenn ihr möchtet. Außerdem organisieren wir am Samstag und Sonntag ein gemeinsames Frühstück, sowohl für alle, die direkt in der Location übernachten, als auch für diejenigen, die im Hotel übernachten und trotzdem gern dazukommen möchten.</p>
+          <p>Wir wollen das ganze Wochenende mit euch feiern! Deshalb könnt ihr gerne schon am Freitag anreisen, wenn ihr möchtet. Außerdem organisieren wir am Samstag und Sonntag ein gemeinsames Frühstück, sowohl für alle, die direkt in der Location übernachten, als auch für diejenigen, die im Hotel übernachten und trotzdem gern dazukommen möchten.</p>
           <strong>Freitag, 08. Mai:</strong> 
           <p> ab 17 Uhr gemütliches Beisammensein & wir kümmern uns um ein einfaches Abendessen. Wir würden uns freuen, wenn ihr eure Lieblingsgetränke selber mitbringt.</p>
           <strong>Samstag, 09. Mai:</strong> 
@@ -38,6 +38,7 @@ function InfoSection() {
           <p>gegen 18:30 Uhr: Essen und anschließend Feiern bis spät in die Nacht</p>
           <strong>Sonntag, 10. Mai:</strong>
           <p>ca. 10 Uhr: Gemeinsames Frühstück und gemeinsamer Ausklang</p>
+          <p>Bitte beachtet, am Samstag zwischen dem Frühstück und der freien Trauung ist kein Programm geplant, sodass sich alle auf den Zimmern/im Hotel in Ruhe entspannen und fertig machen können. Damit wir pünktlich um 14 Uhr mit der Trauung beginnen können, bitten wir euch, ab 13:30 Uhr einzutreffen.</p>
          
         </p>
       </div>
