@@ -76,7 +76,7 @@ def create_guest(guest: GuestCreate, db: Session = Depends(get_db)):
 # Admin endpoint to get all guests
 @app.get("/admin/guests")
 def get_all_guests(db: Session = Depends(get_db)):
-    guests = db.query(Guest).all()
+    guests = db.query(Guest).order_by(Guest.id.desc()).all()
     return guests
 
 # Admin endpoint to delete a guest
@@ -108,7 +108,7 @@ def update_guest(guest_id: int, guest: GuestCreate, db: Session = Depends(get_db
 # Admin endpoint to export guests as Excel
 @app.get("/admin/guests/export")
 def export_guests(db: Session = Depends(get_db)):
-    guests = db.query(Guest).all()
+    guests = db.query(Guest).order_by(Guest.id.desc()).all()
     
     # Create workbook and worksheet
     wb = Workbook()
