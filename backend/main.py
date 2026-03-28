@@ -6,6 +6,9 @@ from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
 from database import init_db, SessionLocal
 from models import Guest
+from routers.storage import router as storage_router
+from routers.photos import router as photos_router
+from routers.auth import router as auth_router
 from openpyxl import Workbook
 from io import BytesIO
 
@@ -26,6 +29,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Routers
+app.include_router(auth_router)
+app.include_router(storage_router)
+app.include_router(photos_router)
 
 # Initialize the database on startup
 @app.on_event("startup")

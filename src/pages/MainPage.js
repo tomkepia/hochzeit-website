@@ -9,7 +9,6 @@ import PhotoUploadSection from "../components/PhotoUploadSection";
 import PasswordGate from "../components/PasswordGate";
 
 // Logout and session logic
-const AUTH_KEY = 'isAuthenticated';
 const SESSION_KEY = 'sessionStart';
 const SESSION_DURATION = 30 * 60 * 1000; // 30 minutes
 
@@ -24,14 +23,15 @@ function MainPage() {
   };
 
   React.useEffect(() => {
-    if (localStorage.getItem(AUTH_KEY) === 'true') {
+    if (localStorage.getItem('galleryAccess') === 'true') {
       const start = localStorage.getItem(SESSION_KEY);
       if (!start) {
         localStorage.setItem(SESSION_KEY, Date.now().toString());
       } else {
         const now = Date.now();
         if (now - parseInt(start, 10) > SESSION_DURATION) {
-          localStorage.removeItem(AUTH_KEY);
+          localStorage.removeItem('galleryAccess');
+          localStorage.removeItem('galleryToken');
           localStorage.removeItem(SESSION_KEY);
           window.location.reload();
         }
@@ -40,10 +40,11 @@ function MainPage() {
     // Set up interval to check session expiration
     const interval = setInterval(() => {
       const start = localStorage.getItem(SESSION_KEY);
-      if (localStorage.getItem(AUTH_KEY) === 'true' && start) {
+      if (localStorage.getItem('galleryAccess') === 'true' && start) {
         const now = Date.now();
         if (now - parseInt(start, 10) > SESSION_DURATION) {
-          localStorage.removeItem(AUTH_KEY);
+          localStorage.removeItem('galleryAccess');
+          localStorage.removeItem('galleryToken');
           localStorage.removeItem(SESSION_KEY);
           window.location.reload();
         }
@@ -53,7 +54,8 @@ function MainPage() {
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem(AUTH_KEY);
+    localStorage.removeItem('galleryAccess');
+    localStorage.removeItem('galleryToken');
     localStorage.removeItem(SESSION_KEY);
     window.location.reload();
   };
