@@ -8,6 +8,8 @@ import React from "react";
  *   selectionMode – whether grid should select instead of open lightbox
  *   selectedPhotoIds – Set<string> of selected photo IDs
  *   onToggleSelect(photoId) – called when user toggles photo selection
+ *   isAdmin – whether to show admin delete buttons
+ *   onDelete(photoId) – called when admin clicks delete
  */
 export default function PhotoGrid({
   photos,
@@ -15,6 +17,8 @@ export default function PhotoGrid({
   selectionMode = false,
   selectedPhotoIds = new Set(),
   onToggleSelect,
+  isAdmin = false,
+  onDelete,
 }) {
   if (!photos || photos.length === 0) return null;
 
@@ -86,6 +90,36 @@ export default function PhotoGrid({
               >
                 ✓
               </div>
+            )}
+
+            {isAdmin && !selectionMode && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete?.(photo.id);
+                }}
+                aria-label="Foto löschen"
+                style={{
+                  position: "absolute",
+                  top: 6,
+                  right: 6,
+                  background: "rgba(0,0,0,0.6)",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "50%",
+                  width: 28,
+                  height: 28,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 14,
+                  lineHeight: 1,
+                  padding: 0,
+                }}
+              >
+                ✕
+              </button>
             )}
           </button>
         );

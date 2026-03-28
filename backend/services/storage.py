@@ -117,6 +117,14 @@ def upload_buffer(key: str, buffer: bytes, content_type: str) -> None:
     logger.info("Uploaded buffer (%d bytes) to s3://%s/%s", len(buffer), bucket, key)
 
 
+def delete_file(key: str) -> None:
+    """Delete a file from S3 by its key."""
+    client = _get_s3_client()
+    bucket = _get_bucket()
+    client.delete_object(Bucket=bucket, Key=key)
+    logger.info("Deleted file s3://%s/%s", bucket, key)
+
+
 def check_connection() -> dict:
     """Verify that the S3 connection and bucket are reachable.
 

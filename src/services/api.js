@@ -20,12 +20,13 @@ function getAuthHeaders() {
 function handle401() {
   localStorage.removeItem("galleryAccess");
   localStorage.removeItem("galleryToken");
+  localStorage.removeItem("galleryPermissions");
   window.location.href = "/";
 }
 
 /**
  * Validate a QR access token with the backend.
- * On success the caller should persist the token to localStorage.
+ * On success returns { status, permissions }.
  */
 export async function tokenLogin(token) {
   const res = await fetch(`${API_BASE}/api/auth/token-login`, {
@@ -36,7 +37,7 @@ export async function tokenLogin(token) {
 
   if (!res.ok) throw new Error("Invalid token");
 
-  return true;
+  return res.json();
 }
 
 /**
@@ -213,4 +214,49 @@ export async function downloadZip(photoIds, filename = "wedding-photos.zip") {
   a.remove();
 
   window.URL.revokeObjectURL(url);
+}
+
+/**
+ * Delete a photo by ID. Requires admin token (delete permission).
+ */
+export async function deletePhoto(photoId) {
+  const response = await fetch(`${API_BASE}/api/photos/${encodeURIComponent(photoId)}`, {
+    method: "DELETE",
+    headers: { ...getAuthHeaders() },
+  });
+
+  if (response.status === 401) {
+    handle401();
+    throw new Error("Session expired");
+  }
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.detail || `Delete failed (${response.status})`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Bulk delete photos by IDs. Requires admin token (delete permission).
+ */
+export async function bulkDeletePhotos(photoIds) {
+  const response = await fetch(`${API_BASE}/api/photos/bulk-delete`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+    body: JSON.stringify({ photoIds }),
+  });
+
+  if (response.status === 401) {
+    handle401();
+    throw new Error("Session expired");
+  }
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.detail || `Bulk delete failed (${response.status})`);
+  }
+
+  return response.json();
 }

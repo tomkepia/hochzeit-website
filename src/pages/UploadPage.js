@@ -13,6 +13,9 @@ export default function UploadPage() {
   const backLink = withToken("/gallery");
   const photosLink = withToken("/photos");
 
+  const permissions = localStorage.getItem("galleryPermissions") || "";
+  const isAdmin = permissions.split(":").includes("admin");
+
   // Route guard: redirect to homepage if no session exists
   useEffect(() => {
     if (!localStorage.getItem("galleryAccess")) {
@@ -23,6 +26,8 @@ export default function UploadPage() {
   const [uploaderName, setUploaderName] = useState(
     () => localStorage.getItem(UPLOADER_NAME_KEY) || ""
   );
+
+  const [category, setCategory] = useState("guest");
 
   const handleNameChange = (e) => {
     const name = e.target.value;
@@ -63,7 +68,29 @@ export default function UploadPage() {
         />
       </div>
 
-      <UploadArea category="guest" uploaderName={uploaderName} />
+      {isAdmin && (
+        <div style={styles.categorySection}>
+          <p style={styles.label}>Kategorie</p>
+          <div style={styles.categoryToggle}>
+            <button
+              type="button"
+              onClick={() => setCategory("guest")}
+              style={category === "guest" ? styles.categoryActive : styles.categoryInactive}
+            >
+              Gästefotos
+            </button>
+            <button
+              type="button"
+              onClick={() => setCategory("photographer")}
+              style={category === "photographer" ? styles.categoryActive : styles.categoryInactive}
+            >
+              Fotografenfotos
+            </button>
+          </div>
+        </div>
+      )}
+
+      <UploadArea category={isAdmin ? category : "guest"} uploaderName={uploaderName} />
 
       <div style={styles.footer}>
         <Link to={backLink} style={styles.backLink}>
@@ -156,5 +183,36 @@ const styles = {
     fontSize: 14,
     color: "#a07850",
     textDecoration: "none",
+  },
+  categorySection: {
+    maxWidth: 600,
+    margin: "0 auto 24px",
+    padding: "0 16px",
+  },
+  categoryToggle: {
+    display: "flex",
+    gap: 8,
+  },
+  categoryActive: {
+    padding: "10px 24px",
+    borderRadius: 9999,
+    border: "1px solid #8b7355",
+    background: "#8b7355",
+    color: "white",
+    fontWeight: 600,
+    fontSize: 14,
+    cursor: "pointer",
+    fontFamily: "'Montserrat', sans-serif",
+  },
+  categoryInactive: {
+    padding: "10px 24px",
+    borderRadius: 9999,
+    border: "1px solid #d8cfc4",
+    background: "transparent",
+    color: "#6b5c4e",
+    fontWeight: 400,
+    fontSize: 14,
+    cursor: "pointer",
+    fontFamily: "'Montserrat', sans-serif",
   },
 };

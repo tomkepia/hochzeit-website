@@ -23,6 +23,7 @@ export default function PasswordGate({ children }) {
       const result = await passwordLogin(input);
       localStorage.setItem('galleryToken', result.token);
       localStorage.setItem('galleryAccess', 'true');
+      localStorage.setItem('galleryPermissions', result.permissions || '');
       navigate('/gallery');
     } catch (err) {
       setError('Falsches Passwort. Bitte versuche es erneut.');

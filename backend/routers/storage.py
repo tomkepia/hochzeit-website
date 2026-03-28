@@ -38,7 +38,7 @@ class UploadUrlRequest(BaseModel):
     category: str
 
 
-@router.post("/upload-url", dependencies=[Depends(require_gallery_access)])
+@router.post("/upload-url", dependencies=[Depends(require_gallery_access())])
 def get_upload_url(request: UploadUrlRequest):
     """Generate a pre-signed PUT URL so the client can upload directly to S3."""
     if request.contentType not in ALLOWED_CONTENT_TYPES:

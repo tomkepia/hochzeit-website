@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { downloadZip, fetchPhotos } from "../services/api";
+import { downloadZip, fetchPhotos, deletePhoto, bulkDeletePhotos } from "../services/api";
 import PhotoGrid from "../components/PhotoGrid";
 import LightboxViewer from "../components/LightboxViewer";
 
@@ -48,6 +48,9 @@ export default function PhotosPage() {
   const backLink = withToken("/gallery");
   const uploadLink = withToken("/upload");
 
+  const permissions = localStorage.getItem("galleryPermissions") || "";
+  const isAdmin = permissions.split(":").includes("admin");
+
   const [category, setCategory] = useState("guest");
   const [sortMode, setSortMode] = useState(initialSortMode);
   const [photos, setPhotos] = useState([]);
@@ -59,6 +62,7 @@ export default function PhotosPage() {
   const [selectedPhotoIds, setSelectedPhotoIds] = useState(() => new Set());
   const [downloadStatus, setDownloadStatus] = useState(null);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
 
   // Refs for values that must be read inside IntersectionObserver without stale closures
@@ -109,7 +113,7 @@ export default function PhotosPage() {
   const selectedCount = selectedPhotoIds.size;
 
   const toggleSelectionMode = () => {
-    if (isDownloading) return;
+    if (isDownloading || isBulkDeleting) return;
 
     if (selectionMode) {
       setSelectionMode(false);
@@ -122,9 +126,58 @@ export default function PhotosPage() {
   };
 
   const cancelSelection = () => {
-    if (isDownloading) return;
+    if (isDownloading || isBulkDeleting) return;
     setSelectedPhotoIds(new Set());
     setSelectionMode(false);
+  };
+
+  const handleDelete = useCallback(async (photoId) => {
+    if (isDownloading || isBulkDeleting) return;
+    const confirmed = window.confirm("Foto wirklich löschen?");
+    if (!confirmed) return;
+
+    try {
+      await deletePhoto(photoId);
+      setPhotos((prev) => prev.filter((p) => p.id !== photoId));
+      showToast("Foto gelöscht");
+    } catch {
+      showToast("Löschen fehlgeschlagen");
+    }
+  }, [isBulkDeleting, isDownloading, showToast]);
+
+  const handleBulkDeleteSelected = async () => {
+    if (!isAdmin || isDownloading || isBulkDeleting) return;
+    if (selectedCount === 0) return;
+
+    const confirmed = window.confirm(`${selectedCount} Foto(s) wirklich löschen?`);
+    if (!confirmed) return;
+
+    const idsToDelete = Array.from(selectedPhotoIds);
+    try {
+      setIsBulkDeleting(true);
+      setError(null);
+      const result = await bulkDeletePhotos(idsToDelete);
+      const deletedSet = new Set(idsToDelete);
+      setPhotos((prev) => prev.filter((photo) => !deletedSet.has(photo.id)));
+      setSelectedPhotoIds(new Set());
+      setSelectionMode(false);
+
+      if ((result?.missingPhotoIds || []).length > 0) {
+        showToast(`Gelöscht (${result.deletedCount}), einige fehlten bereits`);
+      } else {
+        showToast(`${result.deletedCount} Foto(s) gelöscht`);
+      }
+    } catch (err) {
+      const message = err?.message?.toLowerCase?.() || "";
+      if (message.includes("network") || message.includes("failed to fetch")) {
+        setError("Netzwerkfehler");
+        showToast("Netzwerkfehler");
+      } else {
+        showToast("Bulk-Löschen fehlgeschlagen");
+      }
+    } finally {
+      setIsBulkDeleting(false);
+    }
   };
 
   const togglePhotoSelection = useCallback((photoId) => {
@@ -497,7 +550,7 @@ export default function PhotosPage() {
             <div style={{ display: "flex", gap: 8 }}>
               <button
                 onClick={handleDownloadSelected}
-                disabled={selectedCount === 0 || selectedCount > ZIP_LIMIT || isDownloading}
+                disabled={selectedCount === 0 || selectedCount > ZIP_LIMIT || isDownloading || isBulkDeleting}
                 style={{
                   border: "1px solid #8b7355",
                   background: "#8b7355",
@@ -506,19 +559,42 @@ export default function PhotosPage() {
                   minHeight: 48,
                   borderRadius: 999,
                   cursor:
-                    selectedCount === 0 || selectedCount > ZIP_LIMIT || isDownloading
+                    selectedCount === 0 || selectedCount > ZIP_LIMIT || isDownloading || isBulkDeleting
                       ? "not-allowed"
                       : "pointer",
-                  opacity: selectedCount === 0 || selectedCount > ZIP_LIMIT || isDownloading ? 0.55 : 1,
+                  opacity:
+                    selectedCount === 0 || selectedCount > ZIP_LIMIT || isDownloading || isBulkDeleting
+                      ? 0.55
+                      : 1,
                   fontSize: 14,
                 }}
               >
                 Download
               </button>
 
+              {isAdmin && (
+                <button
+                  onClick={handleBulkDeleteSelected}
+                  disabled={selectedCount === 0 || isDownloading || isBulkDeleting}
+                  style={{
+                    border: "1px solid #b3473b",
+                    background: "#b3473b",
+                    color: "#fff",
+                    padding: "8px 14px",
+                    minHeight: 48,
+                    borderRadius: 999,
+                    cursor: selectedCount === 0 || isDownloading || isBulkDeleting ? "not-allowed" : "pointer",
+                    opacity: selectedCount === 0 || isDownloading || isBulkDeleting ? 0.55 : 1,
+                    fontSize: 14,
+                  }}
+                >
+                  Löschen
+                </button>
+              )}
+
               <button
                 onClick={cancelSelection}
-                disabled={isDownloading}
+                disabled={isDownloading || isBulkDeleting}
                 style={{
                   border: "1px solid #d4c9bc",
                   background: "transparent",
@@ -526,8 +602,8 @@ export default function PhotosPage() {
                   padding: "8px 14px",
                   minHeight: 48,
                   borderRadius: 999,
-                  cursor: isDownloading ? "not-allowed" : "pointer",
-                  opacity: isDownloading ? 0.55 : 1,
+                  cursor: isDownloading || isBulkDeleting ? "not-allowed" : "pointer",
+                  opacity: isDownloading || isBulkDeleting ? 0.55 : 1,
                   fontSize: 14,
                 }}
               >
@@ -586,6 +662,8 @@ export default function PhotosPage() {
               selectionMode={selectionMode}
               selectedPhotoIds={selectedPhotoIds}
               onToggleSelect={togglePhotoSelection}
+              isAdmin={isAdmin}
+              onDelete={handleDelete}
             />
           </div>
         )}
@@ -646,7 +724,7 @@ export default function PhotosPage() {
         <div style={{ maxWidth: 1200, margin: "0 auto", display: "flex", width: "100%", gap: 12 }}>
           <button
             onClick={toggleSelectionMode}
-            disabled={isDownloading}
+            disabled={isDownloading || isBulkDeleting}
             style={{
               flex: 1,
               minHeight: 48,
@@ -654,8 +732,8 @@ export default function PhotosPage() {
               border: "1px solid #8b7355",
               background: selectionMode ? "#8b7355" : "transparent",
               color: selectionMode ? "#fff" : "#6b5c4e",
-              cursor: isDownloading ? "not-allowed" : "pointer",
-              opacity: isDownloading ? 0.5 : 1,
+              cursor: isDownloading || isBulkDeleting ? "not-allowed" : "pointer",
+              opacity: isDownloading || isBulkDeleting ? 0.5 : 1,
               fontSize: 14,
             }}
           >
@@ -664,7 +742,7 @@ export default function PhotosPage() {
 
           <button
             onClick={handleDownloadAll}
-            disabled={photos.length === 0 || loading || isDownloading}
+            disabled={photos.length === 0 || loading || isDownloading || isBulkDeleting}
             style={{
               flex: 1,
               minHeight: 48,
@@ -672,8 +750,11 @@ export default function PhotosPage() {
               border: "1px solid #8b7355",
               background: "#f1ede8",
               color: "#6b5c4e",
-              cursor: photos.length === 0 || loading || isDownloading ? "not-allowed" : "pointer",
-              opacity: photos.length === 0 || loading || isDownloading ? 0.5 : 1,
+              cursor:
+                photos.length === 0 || loading || isDownloading || isBulkDeleting
+                  ? "not-allowed"
+                  : "pointer",
+              opacity: photos.length === 0 || loading || isDownloading || isBulkDeleting ? 0.5 : 1,
               fontSize: 14,
             }}
           >

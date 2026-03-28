@@ -65,10 +65,11 @@ def _trigger_photo_processing(photo_id: str) -> None:
     pass  # pragma: no cover
 
 
-@router.post("", dependencies=[Depends(require_gallery_access)])
+@router.post("")
 def register_photo(
     request: PhotoRegisterRequest,
     db: Session = Depends(get_db),
+    token_obj=Depends(require_gallery_access()),
 ):
     """Register a photo that has already been uploaded directly to S3.
 
@@ -80,13 +81,16 @@ def register_photo(
     """
     original_url = storage.get_file_url(request.key)
 
+    permissions_set = set((token_obj.permissions or "").split(":"))
+    effective_category = request.category if "admin" in permissions_set else "guest"
+
     photo = Photo(
         id=uuid_lib.UUID(request.photoId),
         original_key=request.key,
         original_url=original_url,
         preview_url=None,
         thumbnail_url=None,
-        category=request.category,
+        category=effective_category,
         uploaded_by=request.uploadedBy,
         processing_status="pending",
     )
@@ -106,13 +110,14 @@ def register_photo(
     # Trigger async image processing (daemon thread — does not block HTTP response).
     trigger_processing(request.photoId)
 
-    logger.info("Registered photo id=%s category=%s", request.photoId, request.category)
+    logger.info("Registered photo id=%s category=%s", request.photoId, effective_category)
     return {"status": "ok"}
 
 
 SIGNED_URL_EXPIRY = 3600  # 1 hour; matches storage.DOWNLOAD_URL_EXPIRY
 MAX_LIMIT = 100
 MAX_ZIP_PHOTOS = 100
+MAX_BULK_DELETE_PHOTOS = 200
 ZIP_STREAM_CHUNK_SIZE = 64 * 1024
 
 
@@ -126,6 +131,34 @@ class DownloadZipRequest(BaseModel):
             raise ValueError("photoIds must not be empty")
         if len(value) > MAX_ZIP_PHOTOS:
             raise ValueError(f"A maximum of {MAX_ZIP_PHOTOS} photos can be downloaded at once")
+
+        normalized: list[str] = []
+        seen: set[str] = set()
+        for photo_id in value:
+            try:
+                parsed = str(uuid_lib.UUID(photo_id))
+            except ValueError as exc:
+                raise ValueError(f"Invalid photoId: {photo_id}") from exc
+
+            if parsed not in seen:
+                seen.add(parsed)
+                normalized.append(parsed)
+
+        return normalized
+
+
+class BulkDeleteRequest(BaseModel):
+    photoIds: list[str]
+
+    @field_validator("photoIds")
+    @classmethod
+    def validate_photo_ids(cls, value: list[str]) -> list[str]:
+        if not value:
+            raise ValueError("photoIds must not be empty")
+        if len(value) > MAX_BULK_DELETE_PHOTOS:
+            raise ValueError(
+                f"A maximum of {MAX_BULK_DELETE_PHOTOS} photos can be deleted at once"
+            )
 
         normalized: list[str] = []
         seen: set[str] = set()
@@ -173,7 +206,56 @@ def _extension_from_original_key(original_key: str | None) -> str:
     return safe_extension or "jpg"
 
 
-@router.post("/download-zip", dependencies=[Depends(require_gallery_access)])
+def _delete_photo_assets(photo: Photo) -> None:
+    for key in [photo.original_key, photo.preview_key, photo.thumbnail_key]:
+        if key:
+            try:
+                storage.delete_file(key)
+            except Exception:
+                logger.exception("Failed to delete key=%s from storage", key)
+
+
+@router.post("/bulk-delete", dependencies=[Depends(require_gallery_access("delete"))])
+def bulk_delete_photos(request: BulkDeleteRequest, db: Session = Depends(get_db)):
+    photo_ids = [uuid_lib.UUID(photo_id) for photo_id in request.photoIds]
+
+    photos = db.query(Photo).filter(Photo.id.in_(photo_ids)).all()
+    found_ids = {str(photo.id) for photo in photos}
+    missing_ids = [photo_id for photo_id in request.photoIds if photo_id not in found_ids]
+
+    for photo in photos:
+        _delete_photo_assets(photo)
+        db.delete(photo)
+
+    db.commit()
+
+    return {
+        "status": "deleted",
+        "deletedCount": len(photos),
+        "missingPhotoIds": missing_ids,
+    }
+
+
+@router.delete("/{photo_id}", dependencies=[Depends(require_gallery_access("delete"))])
+def delete_photo(photo_id: str, db: Session = Depends(get_db)):
+    try:
+        photo_uuid = uuid_lib.UUID(photo_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid photo ID")
+
+    photo = db.query(Photo).filter(Photo.id == photo_uuid).first()
+    if not photo:
+        raise HTTPException(status_code=404, detail="Photo not found")
+
+    _delete_photo_assets(photo)
+
+    db.delete(photo)
+    db.commit()
+
+    return {"status": "deleted"}
+
+
+@router.post("/download-zip", dependencies=[Depends(require_gallery_access())])
 def download_zip(
     request: DownloadZipRequest,
     db: Session = Depends(get_db),
@@ -229,7 +311,7 @@ def download_zip(
     )
 
 
-@router.get("", dependencies=[Depends(require_gallery_access)])
+@router.get("", dependencies=[Depends(require_gallery_access())])
 def list_photos(
     category: str | None = None,
     limit: int = 50,

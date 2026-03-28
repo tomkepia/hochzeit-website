@@ -12,9 +12,10 @@ export default function GalleryEntryPage() {
   useEffect(() => {
     if (token) {
       tokenLogin(token)
-        .then(() => {
+        .then((data) => {
           localStorage.setItem("galleryToken", token);
           localStorage.setItem("galleryAccess", "true");
+          localStorage.setItem("galleryPermissions", data.permissions || "");
           window.history.replaceState({}, "", "/gallery");
         })
         .catch(() => {

@@ -32,6 +32,7 @@ function MainPage() {
         if (now - parseInt(start, 10) > SESSION_DURATION) {
           localStorage.removeItem('galleryAccess');
           localStorage.removeItem('galleryToken');
+          localStorage.removeItem('galleryPermissions');
           localStorage.removeItem(SESSION_KEY);
           window.location.reload();
         }
@@ -45,6 +46,7 @@ function MainPage() {
         if (now - parseInt(start, 10) > SESSION_DURATION) {
           localStorage.removeItem('galleryAccess');
           localStorage.removeItem('galleryToken');
+          localStorage.removeItem('galleryPermissions');
           localStorage.removeItem(SESSION_KEY);
           window.location.reload();
         }
@@ -56,6 +58,7 @@ function MainPage() {
   const handleLogout = () => {
     localStorage.removeItem('galleryAccess');
     localStorage.removeItem('galleryToken');
+    localStorage.removeItem('galleryPermissions');
     localStorage.removeItem(SESSION_KEY);
     window.location.reload();
   };
