@@ -21,9 +21,11 @@ const TABS = [
 ];
 
 const SORT_MODES = [
-  { key: "upload", label: "Upload" },
-  { key: "taken", label: "Aufnahme" },
+  { key: "upload", label: "Upload-Zeit" },
+  { key: "taken", label: "Aufnahme-Zeit" },
 ];
+
+const floatingBarHeight = 88;
 
 export default function PhotosPage() {
   const navigate = useNavigate();
@@ -336,7 +338,7 @@ export default function PhotosPage() {
 
   return (
     <div style={{ minHeight: "100vh", backgroundColor: "#faf9f7" }}>
-      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "40px 16px 80px" }}>
+      <div style={{ maxWidth: 1200, margin: "0 auto", padding: `32px 16px ${floatingBarHeight + 24}px` }}>
         <div style={{ marginBottom: 24, display: "flex", justifyContent: "space-between", gap: 12 }}>
           <Link
             to={backLink}
@@ -367,7 +369,7 @@ export default function PhotosPage() {
         </div>
 
         {/* Page header */}
-        <div style={{ marginBottom: 36, textAlign: "center" }}>
+        <div style={{ marginBottom: 24, textAlign: "center" }}>
           <h1
             style={{
               fontFamily: "Georgia, 'Playfair Display', serif",
@@ -380,57 +382,9 @@ export default function PhotosPage() {
           >
             Unsere Fotos
           </h1>
-          <p style={{ color: "#9b8a7a", fontSize: 14, margin: 0 }}>
-            Klicke auf ein Foto, um es in voller Größe zu sehen
+          <p style={{ color: "#9b8a7a", fontSize: 14, opacity: 0.8, margin: "0 0 16px" }}>
+            Klicke auf ein Foto, um es zu öffnen.
           </p>
-          <p style={{ color: "#8b7a68", fontSize: 13, margin: "8px 0 0" }}>
-            Im Vollbild kannst du das Original herunterladen.
-          </p>
-        </div>
-
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            gap: 10,
-            marginBottom: 24,
-            flexWrap: "wrap",
-          }}
-        >
-          <span style={{ color: "#7c6b59", fontSize: 14, fontWeight: 500 }}>Sortieren:</span>
-          <div
-            style={{
-              display: "inline-flex",
-              border: "1.5px solid #d4c9bc",
-              borderRadius: 999,
-              overflow: "hidden",
-              background: "#fff",
-            }}
-          >
-            {SORT_MODES.map((mode) => {
-              const active = sortMode === mode.key;
-              return (
-                <button
-                  key={mode.key}
-                  onClick={() => setSortMode(mode.key)}
-                  style={{
-                    border: "none",
-                    minHeight: 46,
-                    minWidth: 110,
-                    padding: "10px 16px",
-                    background: active ? "#8b7355" : "transparent",
-                    color: active ? "#fff" : "#6b5c4e",
-                    fontSize: 14,
-                    fontWeight: active ? 600 : 500,
-                    cursor: "pointer",
-                  }}
-                >
-                  {mode.label}
-                </button>
-              );
-            })}
-          </div>
         </div>
 
         {/* Category tabs */}
@@ -439,8 +393,9 @@ export default function PhotosPage() {
             display: "flex",
             justifyContent: "center",
             gap: 8,
-            marginBottom: 32,
+            marginBottom: 16,
             flexWrap: "wrap",
+            width: "100%",
           }}
         >
           {TABS.map((tab) => {
@@ -452,10 +407,9 @@ export default function PhotosPage() {
                 style={{
                   padding: "10px 24px",
                   borderRadius: 9999,
-                  border: "1.5px solid",
-                  borderColor: active ? "#8b7355" : "#d4c9bc",
-                  backgroundColor: active ? "#8b7355" : "transparent",
-                  color: active ? "#fff" : "#6b5c4e",
+                  border: active ? "1px solid #8b7355" : "1px solid #d8cfc4",
+                  background: active ? "#8b7355" : "transparent",
+                  color: active ? "white" : "#6b5c4e",
                   fontWeight: active ? 600 : 400,
                   fontSize: 14,
                   cursor: "pointer",
@@ -468,51 +422,56 @@ export default function PhotosPage() {
           })}
         </div>
 
-        {/* Actions */}
+        {/* Sorting */}
         <div
           style={{
             display: "flex",
             justifyContent: "center",
-            gap: 10,
-            flexWrap: "wrap",
-            marginBottom: 20,
+            alignItems: "center",
+            gap: 8,
+            marginBottom: 12,
+            fontSize: 14,
+            color: "#5c4a3c",
           }}
         >
-          <button
-            onClick={toggleSelectionMode}
-            disabled={isDownloading}
-            style={{
-              border: "1px solid #8b7355",
-              background: selectionMode ? "#8b7355" : "transparent",
-              color: selectionMode ? "#fff" : "#6b5c4e",
-              padding: "9px 16px",
-              minHeight: 48,
-              borderRadius: 999,
-              cursor: isDownloading ? "not-allowed" : "pointer",
-              opacity: isDownloading ? 0.5 : 1,
-              fontSize: 14,
-            }}
-          >
-            {selectionMode ? "Fertig" : "Auswählen"}
-          </button>
+          <span style={{ fontWeight: 500 }}>Sortieren nach:</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <button
+              onClick={() => setSortMode("upload")}
+              aria-pressed={sortMode === "upload"}
+              style={{
+                background: "transparent",
+                border: "none",
+                padding: "4px 6px",
+                fontSize: 14,
+                color: sortMode === "upload" ? "#5c4a3c" : "#8b7355",
+                fontWeight: sortMode === "upload" ? 600 : 400,
+                textDecoration: sortMode === "upload" ? "underline" : "none",
+                cursor: "pointer",
+              }}
+            >
+              {SORT_MODES[0].label}
+            </button>
 
-          <button
-            onClick={handleDownloadAll}
-            disabled={photos.length === 0 || loading || isDownloading}
-            style={{
-              border: "1px solid #8b7355",
-              background: "#f1ede8",
-              color: "#6b5c4e",
-              padding: "9px 16px",
-              minHeight: 48,
-              borderRadius: 999,
-              cursor: photos.length === 0 || loading || isDownloading ? "not-allowed" : "pointer",
-              opacity: photos.length === 0 || loading || isDownloading ? 0.5 : 1,
-              fontSize: 14,
-            }}
-          >
-            Download All
-          </button>
+            <span style={{ opacity: 0.5 }}>|</span>
+
+            <button
+              onClick={() => setSortMode("taken")}
+              aria-pressed={sortMode === "taken"}
+              style={{
+                background: "transparent",
+                border: "none",
+                padding: "4px 6px",
+                fontSize: 14,
+                color: sortMode === "taken" ? "#5c4a3c" : "#8b7355",
+                fontWeight: sortMode === "taken" ? 600 : 400,
+                textDecoration: sortMode === "taken" ? "underline" : "none",
+                cursor: "pointer",
+              }}
+            >
+              {SORT_MODES[1].label}
+            </button>
+          </div>
         </div>
 
         {selectionMode && (
@@ -534,7 +493,6 @@ export default function PhotosPage() {
               flexWrap: "wrap",
             }}
           >
-            <span style={{ color: "#7a6a5a", fontSize: 13 }}>Tippe auf Fotos, um sie auszuwählen</span>
             <strong style={{ color: "#4f4337", fontSize: 14 }}>{selectedCount} ausgewählt</strong>
             <div style={{ display: "flex", gap: 8 }}>
               <button
@@ -615,13 +573,21 @@ export default function PhotosPage() {
 
         {/* Photo grid */}
         {!error && (
-          <PhotoGrid
-            photos={photos}
-            onPhotoClick={setLightboxIndex}
-            selectionMode={selectionMode}
-            selectedPhotoIds={selectedPhotoIds}
-            onToggleSelect={togglePhotoSelection}
-          />
+          <div style={{ marginTop: 8 }}>
+            {selectionMode && (
+              <p style={{ fontSize: 14, margin: "0 0 8px", opacity: 0.7, color: "#6b5c4e" }}>
+                Tippe auf Fotos, um sie auszuwählen
+              </p>
+            )}
+
+            <PhotoGrid
+              photos={photos}
+              onPhotoClick={setLightboxIndex}
+              selectionMode={selectionMode}
+              selectedPhotoIds={selectedPhotoIds}
+              onToggleSelect={togglePhotoSelection}
+            />
+          </div>
         )}
 
         {/* Empty state (only after first load finishes) */}
@@ -661,6 +627,59 @@ export default function PhotosPage() {
 
         {/* Infinite scroll sentinel — IntersectionObserver watches this element */}
         <div ref={sentinelRef} style={{ height: 1 }} />
+      </div>
+
+      <div
+        style={{
+          position: "fixed",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          padding: "12px 16px",
+          background: "#ffffff",
+          borderTop: "1px solid #e5ddd5",
+          display: "flex",
+          gap: 12,
+          zIndex: 10,
+        }}
+      >
+        <div style={{ maxWidth: 1200, margin: "0 auto", display: "flex", width: "100%", gap: 12 }}>
+          <button
+            onClick={toggleSelectionMode}
+            disabled={isDownloading}
+            style={{
+              flex: 1,
+              minHeight: 48,
+              borderRadius: 24,
+              border: "1px solid #8b7355",
+              background: selectionMode ? "#8b7355" : "transparent",
+              color: selectionMode ? "#fff" : "#6b5c4e",
+              cursor: isDownloading ? "not-allowed" : "pointer",
+              opacity: isDownloading ? 0.5 : 1,
+              fontSize: 14,
+            }}
+          >
+            {selectionMode ? "Fertig" : "Auswählen"}
+          </button>
+
+          <button
+            onClick={handleDownloadAll}
+            disabled={photos.length === 0 || loading || isDownloading}
+            style={{
+              flex: 1,
+              minHeight: 48,
+              borderRadius: 24,
+              border: "1px solid #8b7355",
+              background: "#f1ede8",
+              color: "#6b5c4e",
+              cursor: photos.length === 0 || loading || isDownloading ? "not-allowed" : "pointer",
+              opacity: photos.length === 0 || loading || isDownloading ? 0.5 : 1,
+              fontSize: 14,
+            }}
+          >
+            Download All
+          </button>
+        </div>
       </div>
 
       {/* Lightbox */}
