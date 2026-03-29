@@ -13,7 +13,8 @@
     "react-dom": "^19.1.1",
     "react-router-dom": "^6.26.0",
     "react-scripts": "5.0.1",
-    "web-vitals": "^2.1.4"
+    "web-vitals": "^2.1.4",
+    "yet-another-react-lightbox": "^3.29.1"
   },
   "scripts": {
     "start": "react-scripts start",
@@ -39,5 +40,13 @@
       "last 1 safari version"
     ]
   },
-  "proxy": "http://localhost:8000"
+  "proxy": "http://localhost:8000",
+  "jest": {
+    "moduleNameMapper": {
+      "yet-another-react-lightbox/plugins/(.*)": "<rootDir>/src/__mocks__/yet-another-react-lightbox.js",
+      "yet-another-react-lightbox/styles.css": "<rootDir>/src/__mocks__/fileMock.js",
+      "yet-another-react-lightbox/plugins/(.*)\\.css": "<rootDir>/src/__mocks__/fileMock.js",
+      "yet-another-react-lightbox": "<rootDir>/src/__mocks__/yet-another-react-lightbox.js"
+    }
+  }
 }

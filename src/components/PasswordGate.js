@@ -1,27 +1,34 @@
 import React, { useState, useEffect } from 'react';
-
-const PASSWORD = 'Tomke&Jan-Paul2026'; // Change this to your desired password
-const AUTH_KEY = 'isAuthenticated';
+import { useNavigate } from 'react-router-dom';
+import { passwordLogin } from '../services/api';
 
 export default function PasswordGate({ children }) {
+  const navigate = useNavigate();
   const [authenticated, setAuthenticated] = useState(false);
   const [input, setInput] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (localStorage.getItem(AUTH_KEY) === 'true') {
+    if (localStorage.getItem('galleryAccess') === 'true') {
       setAuthenticated(true);
     }
   }, []);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (input === PASSWORD) {
-      localStorage.setItem(AUTH_KEY, 'true');
-      setAuthenticated(true);
-      setError('');
-    } else {
+    setLoading(true);
+    setError('');
+    try {
+      const result = await passwordLogin(input);
+      localStorage.setItem('galleryToken', result.token);
+      localStorage.setItem('galleryAccess', 'true');
+      localStorage.setItem('galleryPermissions', result.permissions || '');
+      navigate('/gallery');
+    } catch (err) {
       setError('Falsches Passwort. Bitte versuche es erneut.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -39,8 +46,11 @@ export default function PasswordGate({ children }) {
           onChange={e => setInput(e.target.value)}
           placeholder="Passwort"
           style={{ padding: '8px', fontSize: '16px', marginBottom: '8px' }}
+          disabled={loading}
         />
-        <button type="submit" style={{ padding: '8px 16px', fontSize: '16px' }}>Einloggen</button>
+        <button type="submit" style={{ padding: '8px 16px', fontSize: '16px' }} disabled={loading}>
+          {loading ? 'Wird geprüft…' : 'Einloggen'}
+        </button>
       </form>
       {error && <p style={{ color: 'red', marginTop: '8px' }}>{error}</p>}
     </div>

@@ -97,6 +97,8 @@ jobs:
         run: |
           if [ "${{ needs.build-and-deploy.result }}" == "success" ]; then
             echo "✅ Multi-app deployment successful!"
+          elif [ "${{ needs.build-and-deploy.result }}" == "skipped" ]; then
+            echo "⏭️ Deployment skipped (PR build — tests only)"
           else
             echo "❌ Multi-app deployment failed!"
             exit 1

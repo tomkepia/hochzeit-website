@@ -5,3 +5,8 @@ psycopg2-binary
 pydantic
 python-multipart
 openpyxl
+boto3
+Pillow
+pillow-heif
+requests
+zipstream-ng
