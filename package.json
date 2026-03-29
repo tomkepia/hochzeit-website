@@ -42,9 +42,11 @@
   },
   "proxy": "http://localhost:8000",
   "jest": {
-    "transformIgnorePatterns": [
-      "/node_modules/(?!(yet-another-react-lightbox)/)",
-      "\\.pnp\\.[^\\/]+$"
-    ]
+    "moduleNameMapper": {
+      "yet-another-react-lightbox/plugins/(.*)": "<rootDir>/src/__mocks__/yet-another-react-lightbox.js",
+      "yet-another-react-lightbox/styles.css": "<rootDir>/src/__mocks__/fileMock.js",
+      "yet-another-react-lightbox/plugins/(.*)\\.css": "<rootDir>/src/__mocks__/fileMock.js",
+      "yet-another-react-lightbox": "<rootDir>/src/__mocks__/yet-another-react-lightbox.js"
+    }
   }
 }
