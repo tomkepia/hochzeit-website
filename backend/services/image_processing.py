@@ -19,7 +19,6 @@ import time
 import uuid as uuid_lib
 from datetime import datetime
 from io import BytesIO
-from threading import Thread
 from typing import Optional
 
 import pillow_heif
@@ -89,72 +88,57 @@ def extract_taken_at(img: Image.Image) -> Optional[datetime]:
 
 
 # ---------------------------------------------------------------------------
-# Public entry point
+# Public entry point (called by the background worker)
 # ---------------------------------------------------------------------------
 
-def trigger_processing(photo_id: str) -> None:
-    """Start image processing for a photo in a background thread.
+def process_photo_safe(photo_id: str) -> None:
+    """Process a photo and re-raise any exception so the worker can retry.
 
-    Called immediately after the photo is registered in the DB.
-    The thread is daemonized so it does not prevent server shutdown.
-    Errors are caught and logged; they never propagate to the caller.
+    The worker is responsible for all processing_status transitions
+    (pending → processing → done / failed).  This function only performs
+    the image work and persists variant keys to the DB.
     """
-    thread = Thread(
-        target=_safe_process_photo,
-        args=(photo_id,),
-        name=f"img-process-{photo_id[:8]}",
-        daemon=True,
-    )
-    thread.start()
-    logger.info("Processing thread started for photo_id=%s", photo_id)
+    try:
+        _process_photo(photo_id)
+    except Exception:
+        logger.exception("Processing failed for photo_id=%s", photo_id)
+        raise
 
 
 # ---------------------------------------------------------------------------
 # Internal implementation
 # ---------------------------------------------------------------------------
 
-def _safe_process_photo(photo_id: str) -> None:
-    """Top-level wrapper that guarantees no exception escapes the thread."""
-    try:
-        _process_photo(photo_id)
-    except Exception as exc:
-        logger.exception("Unhandled error in processing thread for photo_id=%s: %s", photo_id, exc)
-        _mark_failed(photo_id, f"Unhandled error: {exc}")
-
 
 def _process_photo(photo_id: str) -> None:
+    """Download the original, generate preview + thumbnail, upload to S3.
+
+    Updates the photo row with variant keys/URLs and taken_at.
+    Does NOT modify processing_status — that is owned exclusively by the worker.
+    Raises on any failure so the worker can apply its retry/failure logic.
+    """
     start_time = time.monotonic()
     db = SessionLocal()
 
     try:
         photo = db.query(Photo).filter(Photo.id == uuid_lib.UUID(photo_id)).first()
         if photo is None:
-            logger.error("Processing: photo not found in DB for id=%s", photo_id)
-            return
+            raise RuntimeError(f"Photo not found in DB: {photo_id}")
 
-        # Idempotency: skip if variant keys already exist
+        # Idempotency: variants already generated (e.g. worker restarted after they were written)
         if photo.preview_key and photo.thumbnail_key:
             logger.info("Processing: skipping %s — variants already exist", photo_id)
             return
 
-        # Skip if already processing (concurrent trigger guard)
-        if photo.processing_status == "processing":
-            logger.info("Processing: skipping %s — already in progress", photo_id)
-            return
-
-        _set_status(db, photo, "processing")
-
         # Resolve the storage key
         original_key = _resolve_key(photo)
         if not original_key:
-            _mark_failed_in_session(db, photo, "No usable original_key or original_url")
-            return
+            raise RuntimeError("No usable original_key or original_url")
 
         # Download original with retry
         image_data = _download_with_retry(original_key)
         if image_data is None:
-            _mark_failed_in_session(db, photo, "Failed to download original after retries")
-            return
+            raise RuntimeError("Failed to download original after retries")
 
         file_size_kb = len(image_data) / 1024
         logger.info("Processing %s: downloaded %.1f KB", photo_id, file_size_kb)
@@ -165,8 +149,7 @@ def _process_photo(photo_id: str) -> None:
             taken_at = extract_taken_at(img)
             img = ImageOps.exif_transpose(img)  # fix EXIF rotation
         except Exception as exc:
-            _mark_failed_in_session(db, photo, f"Failed to open image: {exc}")
-            return
+            raise RuntimeError(f"Failed to open image: {exc}") from exc
 
         # Generate preview
         preview_key, preview_url = _generate_and_upload_variant(
@@ -174,8 +157,7 @@ def _process_photo(photo_id: str) -> None:
             PREVIEW_MAX_PX, PREVIEW_JPEG_QUALITY,
         )
         if preview_key is None:
-            _mark_failed_in_session(db, photo, "Failed to generate/upload preview")
-            return
+            raise RuntimeError("Failed to generate/upload preview")
 
         # Generate thumbnail
         thumb_key, thumb_url = _generate_and_upload_variant(
@@ -183,17 +165,15 @@ def _process_photo(photo_id: str) -> None:
             THUMBNAIL_MAX_PX, THUMBNAIL_JPEG_QUALITY,
         )
         if thumb_key is None:
-            _mark_failed_in_session(db, photo, "Failed to generate/upload thumbnail")
-            return
+            raise RuntimeError("Failed to generate/upload thumbnail")
 
-        # Update DB with keys (canonical) and convenience URLs
+        # Persist variant keys/URLs and EXIF capture date.
+        # processing_status is managed exclusively by the worker.
         photo.preview_key = preview_key
         photo.preview_url = preview_url
         photo.thumbnail_key = thumb_key
         photo.thumbnail_url = thumb_url
         photo.taken_at = taken_at
-        photo.processing_status = "done"
-        photo.processing_error = None
         db.commit()
 
         elapsed = time.monotonic() - start_time
@@ -202,14 +182,9 @@ def _process_photo(photo_id: str) -> None:
             photo_id, elapsed, file_size_kb, photo.category,
         )
 
-    except Exception as exc:
-        logger.exception("Processing error for photo_id=%s: %s", photo_id, exc)
-        try:
-            photo = db.query(Photo).filter(Photo.id == uuid_lib.UUID(photo_id)).first()
-            if photo:
-                _mark_failed_in_session(db, photo, str(exc))
-        except Exception:
-            pass
+    except Exception:
+        # Re-raise so process_photo_safe / the worker can handle retries.
+        raise
     finally:
         db.close()
 
@@ -268,14 +243,19 @@ def _generate_and_upload_variant(
     """
     try:
         copy = img.copy()
-        copy.thumbnail((max_px, max_px), Image.LANCZOS)
+        # Use LANCZOS for the large preview (quality matters) and BICUBIC for
+        # thumbnails (much faster, imperceptible difference at 300 px).
+        resample = Image.LANCZOS if max_px >= 800 else Image.BICUBIC
+        copy.thumbnail((max_px, max_px), resample)
 
         # HEIC/PNG/WebP may have an alpha channel — flatten to RGB before JPEG encoding
         if copy.mode != "RGB":
             copy = copy.convert("RGB")
 
         buf = BytesIO()
-        copy.save(buf, format="JPEG", quality=jpeg_quality, optimize=True)
+        # optimize=True runs a slow multi-pass Huffman search — omit it to cut
+        # encoding CPU time by ~60 % with no visible quality difference.
+        copy.save(buf, format="JPEG", quality=jpeg_quality)
         buf.seek(0)
         raw = buf.read()
 
@@ -291,29 +271,4 @@ def _generate_and_upload_variant(
         return None, None
 
 
-def _set_status(db, photo: Photo, status: str) -> None:
-    photo.processing_status = status
-    db.commit()
 
-
-def _mark_failed_in_session(db, photo: Photo, error: str) -> None:
-    photo.processing_status = "failed"
-    photo.processing_error = error
-    try:
-        db.commit()
-    except Exception:
-        db.rollback()
-    logger.error("Processing failed for photo %s: %s", photo.id, error)
-
-
-def _mark_failed(photo_id: str, error: str) -> None:
-    """Fallback for when the DB session isn't available in the calling scope."""
-    db = SessionLocal()
-    try:
-        photo = db.query(Photo).filter(Photo.id == uuid_lib.UUID(photo_id)).first()
-        if photo:
-            _mark_failed_in_session(db, photo, error)
-    except Exception as exc:
-        logger.error("Could not mark photo %s as failed: %s", photo_id, exc)
-    finally:
-        db.close()

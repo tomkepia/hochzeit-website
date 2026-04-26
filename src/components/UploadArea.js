@@ -1,23 +1,120 @@
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { requestUploadUrl, uploadToS3, registerPhoto, validateFile } from "../services/api";
 
-const MAX_CONCURRENT = 4;
+const MAX_CONCURRENT_UPLOADS = 2;
+const MAX_IMAGE_DIMENSION = 2000;
+const MAX_INPUT_DIMENSION = 8000;
+const JPEG_QUALITY = 0.8;
 
-// Status values: "pending" | "uploading" | "success" | "error"
+// Status values: "queued" | "processing" | "uploading" | "done" | "error"
 function createFileEntry(file) {
   return {
     id: `${file.name}-${file.size}-${file.lastModified}`,
     file,
-    status: "pending",
+    status: "queued",
     progress: 0,
     error: null,
+    processedSize: null,
   };
+}
+
+function stripExtension(filename) {
+  return filename.replace(/\.[^.]+$/, "");
+}
+
+function detectTransparency(ctx, width, height) {
+  const sampleStep = Math.max(1, Math.floor(Math.max(width, height) / 256));
+  const { data } = ctx.getImageData(0, 0, width, height);
+  const pixelStride = 4 * sampleStep;
+
+  for (let idx = 3; idx < data.length; idx += pixelStride) {
+    if (data[idx] < 255) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+async function resizeImage(file) {
+  let bitmap;
+  let canvas;
+
+  try {
+    try {
+      // Respect EXIF orientation where supported.
+      bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+    } catch {
+      bitmap = await createImageBitmap(file);
+    }
+
+    const { width, height } = bitmap;
+    if (width > MAX_INPUT_DIMENSION || height > MAX_INPUT_DIMENSION) {
+      throw new Error(`Bildauflösung zu groß (max. ${MAX_INPUT_DIMENSION}px pro Seite)`);
+    }
+
+    if (width <= MAX_IMAGE_DIMENSION && height <= MAX_IMAGE_DIMENSION) {
+      return file;
+    }
+
+    const scale = Math.min(MAX_IMAGE_DIMENSION / width, MAX_IMAGE_DIMENSION / height);
+    const nextWidth = Math.max(1, Math.round(width * scale));
+    const nextHeight = Math.max(1, Math.round(height * scale));
+
+    canvas = document.createElement("canvas");
+    canvas.width = nextWidth;
+    canvas.height = nextHeight;
+
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) {
+      throw new Error("Resize context unavailable");
+    }
+
+    ctx.drawImage(bitmap, 0, 0, nextWidth, nextHeight);
+
+    const inputIsPng = file.type === "image/png";
+    const keepPng = inputIsPng && detectTransparency(ctx, nextWidth, nextHeight);
+    const outType = keepPng ? "image/png" : "image/jpeg";
+
+    const blob = await new Promise((resolve, reject) => {
+      canvas.toBlob(
+        (result) => {
+          if (!result) {
+            reject(new Error("Resize failed"));
+            return;
+          }
+          resolve(result);
+        },
+        outType,
+        keepPng ? undefined : JPEG_QUALITY
+      );
+    });
+
+    const baseName = stripExtension(file.name);
+    const extension = keepPng ? "png" : "jpg";
+    return new File([blob], `${baseName}.${extension}`, {
+      type: outType,
+      lastModified: file.lastModified,
+    });
+  } finally {
+    if (bitmap && typeof bitmap.close === "function") {
+      bitmap.close();
+    }
+    if (canvas) {
+      canvas.width = 0;
+      canvas.height = 0;
+      canvas = null;
+    }
+  }
 }
 
 export default function UploadArea({ category = "guest", uploaderName = "" }) {
   const [fileEntries, setFileEntries] = useState([]);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [activeUploads, setActiveUploads] = useState(0);
+  const [isQueueRunning, setIsQueueRunning] = useState(false);
   const fileInputRef = useRef(null);
+  const abortControllersRef = useRef(new Map());
 
   const updateEntry = useCallback((id, patch) => {
     setFileEntries((prev) =>
@@ -29,7 +126,7 @@ export default function UploadArea({ category = "guest", uploaderName = "" }) {
     const entries = [];
     for (const file of newFiles) {
       const error = validateFile(file);
-      entries.push({ ...createFileEntry(file), error, status: error ? "error" : "pending" });
+      entries.push({ ...createFileEntry(file), error, status: error ? "error" : "queued" });
     }
     setFileEntries((prev) => [...prev, ...entries]);
   }, []);
@@ -58,44 +155,102 @@ export default function UploadArea({ category = "guest", uploaderName = "" }) {
   };
 
   async function uploadEntry(entry) {
-    updateEntry(entry.id, { status: "uploading", progress: 0, error: null });
+    updateEntry(entry.id, { status: "processing", progress: 0, error: null });
 
     try {
+      let processedFile;
+      try {
+        processedFile = await resizeImage(entry.file);
+      } catch (resizeErr) {
+        // Some browsers cannot decode HEIC/HEIF via createImageBitmap; fallback to original upload.
+        if (entry.file.type === "image/heic" || entry.file.type === "image/heif") {
+          processedFile = entry.file;
+        } else {
+          throw resizeErr;
+        }
+      }
+
+      const controller = new AbortController();
+      abortControllersRef.current.set(entry.id, controller);
+      updateEntry(entry.id, { status: "uploading", progress: 0, error: null });
+
       // Step 1: Get pre-signed upload URL
       const { uploadUrl, photoId, key } = await requestUploadUrl(
-        entry.file.name,
-        entry.file.type,
-        category
+        processedFile.name,
+        processedFile.type,
+        category,
+        processedFile.size
       );
 
       // Step 2: Upload file directly to S3
-      await uploadToS3(uploadUrl, entry.file, entry.file.type, (percent) => {
-        updateEntry(entry.id, { progress: percent });
-      });
+      await uploadToS3(
+        uploadUrl,
+        processedFile,
+        processedFile.type,
+        (percent) => {
+          updateEntry(entry.id, { progress: percent });
+        },
+        controller.signal
+      );
 
       // Step 3: Register in DB only after successful S3 upload
       await registerPhoto(photoId, key, category, uploaderName);
 
-      updateEntry(entry.id, { status: "success", progress: 100 });
+      updateEntry(entry.id, {
+        status: "done",
+        progress: 100,
+        processedSize: processedFile.size,
+      });
     } catch (err) {
       console.error("Upload failed for", entry.file.name, err);
       updateEntry(entry.id, { status: "error", error: err.message });
+    } finally {
+      abortControllersRef.current.delete(entry.id);
+      setActiveUploads((prev) => Math.max(0, prev - 1));
     }
   }
 
-  async function startUploads() {
-    const pending = fileEntries.filter((e) => e.status === "pending");
-    if (pending.length === 0) return;
+  useEffect(() => {
+    if (!isQueueRunning) return;
+    if (activeUploads >= MAX_CONCURRENT_UPLOADS) return;
 
-    // Process in batches to cap concurrency
-    for (let i = 0; i < pending.length; i += MAX_CONCURRENT) {
-      const batch = pending.slice(i, i + MAX_CONCURRENT);
-      await Promise.all(batch.map(uploadEntry));
+    const queued = fileEntries.filter((e) => e.status === "queued");
+    if (queued.length === 0) {
+      if (activeUploads === 0) {
+        setIsQueueRunning(false);
+      }
+      return;
     }
+
+    const availableSlots = MAX_CONCURRENT_UPLOADS - activeUploads;
+    const toStart = queued.slice(0, availableSlots);
+
+    if (toStart.length === 0) return;
+
+    setActiveUploads((prev) => prev + toStart.length);
+    toStart.forEach((entry) => {
+      uploadEntry(entry);
+    });
+  }, [activeUploads, fileEntries, isQueueRunning]);
+
+  function startUploads() {
+    const queuedCount = fileEntries.filter((e) => e.status === "queued").length;
+    if (queuedCount === 0) return;
+    setIsQueueRunning(true);
   }
 
-  const hasPending = fileEntries.some((e) => e.status === "pending");
-  const allDone = fileEntries.length > 0 && fileEntries.every((e) => e.status === "success");
+  const clearQueue = useCallback(() => {
+    setIsQueueRunning(false);
+    for (const controller of abortControllersRef.current.values()) {
+      controller.abort();
+    }
+    abortControllersRef.current.clear();
+    setActiveUploads(0);
+    setFileEntries((prev) => prev.filter((e) => e.status === "done"));
+  }, []);
+
+  const hasQueued = fileEntries.some((e) => e.status === "queued");
+  const allDone = fileEntries.length > 0 && fileEntries.every((e) => e.status === "done");
 
   return (
     <div style={styles.container}>
@@ -118,7 +273,7 @@ export default function UploadArea({ category = "guest", uploaderName = "" }) {
         <p style={styles.dropText}>
           Bilder hier ablegen oder <u>auswählen</u>
         </p>
-        <p style={styles.dropHint}>JPEG, PNG, WebP, HEIC · max. 15 MB pro Datei</p>
+        <p style={styles.dropHint}>JPEG, PNG, WebP, HEIC · max. 20 MB pro Datei</p>
         <input
           ref={fileInputRef}
           type="file"
@@ -137,7 +292,10 @@ export default function UploadArea({ category = "guest", uploaderName = "" }) {
               key={entry.id}
               entry={entry}
               onRemove={() => removeEntry(entry.id)}
-              onRetry={() => uploadEntry(entry)}
+              onRetry={() => {
+                updateEntry(entry.id, { status: "queued", error: null, progress: 0 });
+                setIsQueueRunning(true);
+              }}
             />
           ))}
         </div>
@@ -149,15 +307,24 @@ export default function UploadArea({ category = "guest", uploaderName = "" }) {
           {allDone ? (
             <p style={styles.successMessage}>✓ Alle Fotos wurden hochgeladen!</p>
           ) : (
-            <button
-              style={{ ...styles.uploadBtn, ...(hasPending ? {} : styles.uploadBtnDisabled) }}
-              onClick={startUploads}
-              disabled={!hasPending}
-            >
-              {fileEntries.some((e) => e.status === "uploading")
-                ? "Wird hochgeladen…"
-                : `${fileEntries.filter((e) => e.status === "pending").length} Foto(s) hochladen`}
-            </button>
+            <div style={styles.actionButtons}>
+              <button
+                style={{ ...styles.uploadBtn, ...(hasQueued ? {} : styles.uploadBtnDisabled) }}
+                onClick={startUploads}
+                disabled={!hasQueued}
+              >
+                {activeUploads > 0
+                  ? "Wird hochgeladen…"
+                  : `${fileEntries.filter((e) => e.status === "queued").length} Foto(s) hochladen`}
+              </button>
+              <button
+                style={styles.clearBtn}
+                onClick={clearQueue}
+                disabled={fileEntries.length === 0}
+              >
+                Warteschlange leeren
+              </button>
+            </div>
           )}
         </div>
       )}
@@ -166,7 +333,7 @@ export default function UploadArea({ category = "guest", uploaderName = "" }) {
 }
 
 function FileRow({ entry, onRemove, onRetry }) {
-  const { file, status, progress, error } = entry;
+  const { file, status, progress, error, processedSize } = entry;
 
   return (
     <div style={styles.fileRow}>
@@ -176,8 +343,13 @@ function FileRow({ entry, onRemove, onRetry }) {
         </span>
         <span style={styles.fileSize}>
           {(file.size / 1024 / 1024).toFixed(1)} MB
+          {processedSize ? ` → ${(processedSize / 1024 / 1024).toFixed(1)} MB` : ""}
         </span>
       </div>
+
+      {status === "queued" && <p style={styles.queuedText}>Wartet…</p>}
+
+      {status === "processing" && <p style={styles.queuedText}>Optimieren…</p>}
 
       {status === "uploading" && (
         <div style={styles.progressBar}>
@@ -196,13 +368,13 @@ function FileRow({ entry, onRemove, onRetry }) {
       )}
 
       <div style={styles.rowActions}>
-        {status === "success" && <span style={styles.successBadge}>✓ Gespeichert</span>}
+        {status === "done" && <span style={styles.successBadge}>✓ Gespeichert</span>}
         {status === "error" && (
           <button style={styles.retryBtn} onClick={onRetry}>
             Erneut versuchen
           </button>
         )}
-        {(status === "pending" || status === "error") && (
+        {(status === "queued" || status === "error") && (
           <button style={styles.removeBtn} onClick={onRemove} aria-label="Entfernen">
             ✕
           </button>
@@ -299,6 +471,11 @@ const styles = {
     fontSize: 12,
     color: "#c0392b",
   },
+  queuedText: {
+    margin: "4px 0",
+    fontSize: 12,
+    color: "#7a6a5c",
+  },
   rowActions: {
     display: "flex",
     alignItems: "center",
@@ -333,6 +510,12 @@ const styles = {
     marginTop: 16,
     textAlign: "center",
   },
+  actionButtons: {
+    display: "flex",
+    gap: 8,
+    justifyContent: "center",
+    flexWrap: "wrap",
+  },
   uploadBtn: {
     padding: "12px 28px",
     fontSize: 15,
@@ -345,6 +528,16 @@ const styles = {
     width: "100%",
     maxWidth: 340,
     transition: "background-color 0.2s",
+  },
+  clearBtn: {
+    padding: "12px 18px",
+    fontSize: 14,
+    fontWeight: 500,
+    borderRadius: 8,
+    border: "1px solid #d2c2b1",
+    backgroundColor: "#fff",
+    color: "#7a6755",
+    cursor: "pointer",
   },
   uploadBtnDisabled: {
     backgroundColor: "#ccc",

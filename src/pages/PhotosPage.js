@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { downloadZip, fetchPhotos, deletePhoto, bulkDeletePhotos } from "../services/api";
+import { downloadZip, fetchPhotos, deletePhoto, bulkDeletePhotos, retryPhoto, fetchProcessingStats } from "../services/api";
 import PhotoGrid from "../components/PhotoGrid";
 import LightboxViewer from "../components/LightboxViewer";
 
@@ -8,6 +8,8 @@ const LIMIT = 50;
 const ZIP_LIMIT = 100;
 const MULTI_DOWNLOAD_DELAY_MS = 500;
 const REFRESH_AFTER_MS = 55 * 60 * 1000;
+const PHOTO_POLL_INTERVAL_MS = 7000;
+const STATS_WARNING_SECONDS = 30;
 
 function delay(ms) {
   return new Promise((resolve) => {
@@ -64,6 +66,8 @@ export default function PhotosPage() {
   const [isDownloading, setIsDownloading] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
+  const [processingStats, setProcessingStats] = useState(null);
+  const [retryingPhotoIds, setRetryingPhotoIds] = useState(() => new Set());
 
   // Refs for values that must be read inside IntersectionObserver without stale closures
   const offsetRef = useRef(0);
@@ -85,6 +89,21 @@ export default function PhotosPage() {
       toastTimeoutRef.current = null;
     }, 2800);
   }, []);
+
+  const loadStats = useCallback(async () => {
+    try {
+      const data = await fetchProcessingStats();
+      setProcessingStats(data);
+    } catch { /* silently ignore — admin only endpoint */ }
+  }, []);
+
+  // Auto-refresh processing stats every 5 s for admins.
+  useEffect(() => {
+    if (!isAdmin) return;
+    loadStats();
+    const interval = setInterval(loadStats, 5000);
+    return () => clearInterval(interval);
+  }, [isAdmin, loadStats]);
 
   const doLoad = useCallback(async (cat, off, replace, sort) => {
     if (loadingRef.current) return;
@@ -110,6 +129,69 @@ export default function PhotosPage() {
     }
   }, []);
 
+  const refreshVisiblePhotos = useCallback(async () => {
+    if (loadingRef.current) return;
+
+    const targetCount = Math.max(offsetRef.current, photos.length, LIMIT);
+    const refreshed = [];
+    let nextOffset = 0;
+    let nextHasMore = false;
+
+    try {
+      do {
+        // eslint-disable-next-line no-await-in-loop
+        const data = await fetchPhotos(categoryRef.current, LIMIT, nextOffset, sortRef.current);
+        const batch = data.photos || [];
+
+        if (
+          categoryRef.current !== category ||
+          sortRef.current !== sortMode
+        ) {
+          return;
+        }
+
+        refreshed.push(...batch);
+        nextOffset += batch.length;
+        nextHasMore = data.hasMore;
+      } while (nextHasMore && refreshed.length < targetCount);
+
+      setPhotos(refreshed);
+      offsetRef.current = refreshed.length;
+      hasMoreRef.current = nextHasMore;
+      setHasMore(nextHasMore);
+      lastFetchedAtRef.current = Date.now();
+    } catch {
+      // Silent by design: background polling should not replace current UI with an error state.
+    }
+  }, [category, photos.length, sortMode]);
+
+  // Photos that have finished processing — used to drive the lightbox.
+  const donePhotos = useMemo(
+    () => photos.filter((p) => !p.processingStatus || p.processingStatus === "done"),
+    [photos]
+  );
+
+  const hasNonDonePhotos = useMemo(
+    () => photos.some((p) => p.processingStatus && p.processingStatus !== "done"),
+    [photos]
+  );
+
+  const allVisiblePhotosAreProcessing = useMemo(
+    () => photos.length > 0 && photos.every((p) => p.processingStatus && p.processingStatus !== "done"),
+    [photos]
+  );
+
+  // Map a grid index (into photos[]) to a lightbox index (into donePhotos[]).
+  const handlePhotoClick = useCallback(
+    (gridIndex) => {
+      const photo = photos[gridIndex];
+      if (!photo) return;
+      const lbIndex = donePhotos.findIndex((p) => p.id === photo.id);
+      if (lbIndex >= 0) setLightboxIndex(lbIndex);
+    },
+    [photos, donePhotos]
+  );
+
   const selectedCount = selectedPhotoIds.size;
 
   const toggleSelectionMode = () => {
@@ -130,6 +212,37 @@ export default function PhotosPage() {
     setSelectedPhotoIds(new Set());
     setSelectionMode(false);
   };
+
+  const handleRetry = useCallback(async (photoId) => {
+    if (retryingPhotoIds.has(photoId)) return;
+
+    setRetryingPhotoIds((prev) => {
+      const next = new Set(prev);
+      next.add(photoId);
+      return next;
+    });
+
+    try {
+      await retryPhoto(photoId);
+      showToast("Foto wird erneut verarbeitet");
+      setPhotos((prev) =>
+        prev.map((p) =>
+          p.id === photoId
+            ? { ...p, processingStatus: "pending", processingAttempts: 0, processingError: null }
+            : p
+        )
+      );
+      loadStats();
+    } catch {
+      showToast("Retry fehlgeschlagen");
+    } finally {
+      setRetryingPhotoIds((prev) => {
+        const next = new Set(prev);
+        next.delete(photoId);
+        return next;
+      });
+    }
+  }, [loadStats, retryingPhotoIds, showToast]);
 
   const handleDelete = useCallback(async (photoId) => {
     if (isDownloading || isBulkDeleting) return;
@@ -259,20 +372,26 @@ export default function PhotosPage() {
       hasMoreRef.current = false;
       setHasMore(false);
 
-      if (allPhotoIds.length === 0) {
+      // Only include fully processed photos in the ZIP.
+      const downloadableIds = allPhotoIds.filter((id) => {
+        const p = allPhotoMap.get(id);
+        return !p?.processingStatus || p.processingStatus === "done";
+      });
+
+      if (downloadableIds.length === 0) {
         setDownloadStatus(null);
         showToast("Keine Fotos gefunden");
         return;
       }
 
       const chunks = [];
-      for (let i = 0; i < allPhotoIds.length; i += ZIP_LIMIT) {
-        chunks.push(allPhotoIds.slice(i, i + ZIP_LIMIT));
+      for (let i = 0; i < downloadableIds.length; i += ZIP_LIMIT) {
+        chunks.push(downloadableIds.slice(i, i + ZIP_LIMIT));
       }
 
       if (chunks.length > 1) {
         const proceed = window.confirm(
-          `Du lädst viele Fotos herunter (ca. ${allPhotoIds.length}).\nDies kann mehrere Downloads auslösen.\n\nFortfahren?`
+          `Du lädst viele Fotos herunter (ca. ${downloadableIds.length}).\nDies kann mehrere Downloads auslösen.\n\nFortfahren?`
         );
         if (!proceed) {
           setDownloadStatus(null);
@@ -380,6 +499,17 @@ export default function PhotosPage() {
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
   }, [doLoad, isDownloading]);
+
+  useEffect(() => {
+    if (!hasNonDonePhotos) return;
+
+    const interval = setInterval(() => {
+      if (loadingRef.current || isDownloading || isBulkDeleting) return;
+      refreshVisiblePhotos();
+    }, PHOTO_POLL_INTERVAL_MS);
+
+    return () => clearInterval(interval);
+  }, [hasNonDonePhotos, isBulkDeleting, isDownloading, refreshVisiblePhotos]);
 
   useEffect(() => {
     return () => {
@@ -527,6 +657,75 @@ export default function PhotosPage() {
           </div>
         </div>
 
+        {/* Admin processing stats panel */}
+        {isAdmin && processingStats && (
+          <div
+            style={{
+              margin: "12px 0",
+              padding: "10px 16px",
+              background:
+                processingStats.failed > 0
+                  ? "#f9ece9"
+                  : processingStats.oldestPendingSeconds > STATS_WARNING_SECONDS
+                    ? "#fbf3e6"
+                    : "#f5f1ec",
+              border:
+                processingStats.failed > 0
+                  ? "1px solid #e0afa8"
+                  : processingStats.oldestPendingSeconds > STATS_WARNING_SECONDS
+                    ? "1px solid #e6c79f"
+                    : "1px solid #e0d5c8",
+              borderRadius: 10,
+              fontSize: 13,
+              color: "#5c4a3c",
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "6px 20px",
+              alignItems: "center",
+            }}
+          >
+            <span style={{ fontWeight: 600, marginRight: 4 }}>Verarbeitung:</span>
+            {processingStats.pending > 0 && (
+              <span>Wartend: <strong>{processingStats.pending}</strong></span>
+            )}
+            {processingStats.processing > 0 && (
+              <span>Aktiv: <strong>{processingStats.processing}</strong></span>
+            )}
+            {processingStats.failed > 0 && (
+              <span style={{ color: "#b3473b" }}>Fehlgeschlagen: <strong>{processingStats.failed}</strong></span>
+            )}
+            <span style={{ opacity: 0.7 }}>Fertig: <strong>{processingStats.done}</strong></span>
+            {processingStats.oldestPendingSeconds > 0 && (
+              <span
+                style={{
+                  color: processingStats.oldestPendingSeconds > STATS_WARNING_SECONDS ? "#9a6424" : undefined,
+                  fontWeight: processingStats.oldestPendingSeconds > STATS_WARNING_SECONDS ? 600 : 400,
+                  opacity: processingStats.oldestPendingSeconds > STATS_WARNING_SECONDS ? 1 : 0.6,
+                }}
+              >
+                Ältestes: {processingStats.oldestPendingSeconds}s
+              </span>
+            )}
+          </div>
+        )}
+
+        {!error && allVisiblePhotosAreProcessing && (
+          <div
+            style={{
+              margin: "8px 0 14px",
+              padding: "10px 14px",
+              background: "#f4efe8",
+              border: "1px solid #e2d6c8",
+              borderRadius: 10,
+              color: "#6b5c4e",
+              fontSize: 14,
+              textAlign: "center",
+            }}
+          >
+            Fotos werden gerade verarbeitet…
+          </div>
+        )}
+
         {selectionMode && (
           <div
             style={{
@@ -658,12 +857,14 @@ export default function PhotosPage() {
 
             <PhotoGrid
               photos={photos}
-              onPhotoClick={setLightboxIndex}
+              onPhotoClick={handlePhotoClick}
               selectionMode={selectionMode}
               selectedPhotoIds={selectedPhotoIds}
               onToggleSelect={togglePhotoSelection}
               isAdmin={isAdmin}
               onDelete={handleDelete}
+              onRetry={handleRetry}
+              retryingPhotoIds={retryingPhotoIds}
             />
           </div>
         )}
@@ -766,7 +967,7 @@ export default function PhotosPage() {
       {/* Lightbox */}
       {lightboxIndex >= 0 && !selectionMode && (
         <LightboxViewer
-          photos={photos}
+          photos={donePhotos}
           index={lightboxIndex}
           onClose={() => setLightboxIndex(-1)}
           onIndexChange={setLightboxIndex}
