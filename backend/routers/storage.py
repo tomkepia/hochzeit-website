@@ -1,6 +1,5 @@
 import uuid
 import logging
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -19,6 +18,7 @@ ALLOWED_CONTENT_TYPES = {
     "image/heic",
     "image/heif",
 }
+MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024
 
 # Maps MIME type → canonical file extension for original uploads
 CONTENT_TYPE_EXTENSIONS = {
@@ -36,6 +36,7 @@ class UploadUrlRequest(BaseModel):
     filename: str
     contentType: str
     category: str
+    fileSize: int | None = None
 
 
 @router.post("/upload-url", dependencies=[Depends(require_gallery_access())])
@@ -54,6 +55,12 @@ def get_upload_url(request: UploadUrlRequest):
             detail=f"Invalid category '{request.category}'. "
                    f"Must be one of: {sorted(ALLOWED_CATEGORIES)}",
         )
+
+    if request.fileSize is not None:
+        if request.fileSize < 0:
+            raise HTTPException(status_code=400, detail="Invalid file size")
+        if request.fileSize > MAX_FILE_SIZE_BYTES:
+            raise HTTPException(status_code=400, detail="File too large (max. 20 MB)")
 
     photo_uuid = str(uuid.uuid4())
     extension = CONTENT_TYPE_EXTENSIONS[request.contentType]

@@ -83,7 +83,7 @@ hochzeit-website/
 ├── src/                        # React source code
 │   ├── App.js                  # Root component, client-side routing
 │   ├── services/
-│   │   └── api.js              # API communication (upload flow, gallery list, ZIP downloads)
+│   │   └── api.js              # API communication (upload flow with retry, gallery list, ZIP downloads)
 │   ├── pages/
 │   │   ├── MainPage.js         # Guest-facing page (password-gated)
 │   │   ├── AdminPage.js        # Admin dashboard (admin-password-gated)
@@ -239,7 +239,7 @@ The backend is a **FastAPI** application running under **uvicorn**. It is struct
 - `routers/storage.py` — photo storage endpoints mounted at `/api/storage`
 - `routers/photos.py` — photo registration, listing, and ZIP download endpoints mounted at `/api/photos`
 - `services/storage.py` — S3 client helpers (presigned URL generation, upload)
-- `services/image_processing.py` — async image processing (thumbnails, previews, HEIC conversion, EXIF extraction)
+- `services/image_processing.py` — async image processing (thumbnails, previews, HEIC conversion, EXIF extraction); jobs are queued through a bounded `ThreadPoolExecutor(max_workers=2)` to prevent CPU saturation under concurrent load
 
 ### API Endpoints
 
@@ -430,7 +430,7 @@ Request body:
 
 Response: `{"status": "ok", "photoId": "<uuid>"}`
 
-Image processing (thumbnail + preview generation) starts automatically in the background. The endpoint returns immediately.
+Image processing (thumbnail + preview generation) starts automatically in the background. The endpoint returns immediately. Processing jobs are queued in a bounded pool (max 2 concurrent) to prevent CPU saturation under concurrent upload load. The frontend retries this endpoint up to 3 times with exponential back-off (1.5 s, 3 s, 6 s) on 5xx responses, so transient server overload does not permanently lose a photo that was already uploaded to S3.
 
 #### `GET /api/photos` — List Photos
 

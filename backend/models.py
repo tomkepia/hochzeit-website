@@ -28,7 +28,14 @@ class Photo(Base):
     uploaded_by = Column(String)
     # Processing status: "pending" | "processing" | "done" | "failed"
     processing_status = Column(String, default="pending")
+    # Incremented by the worker each time it claims the job.  Allows capping retries.
+    # Migration for existing databases: ALTER TABLE photos ADD COLUMN processing_attempts INTEGER NOT NULL DEFAULT 0;
+    processing_attempts = Column(Integer, default=0, server_default="0", nullable=False)
     processing_error = Column(Text)  # stores error message on failure
+    # Earliest time the worker may next attempt this job (backoff).
+    # NULL = job is ready to run immediately.
+    # Migration for existing databases: ALTER TABLE photos ADD COLUMN next_attempt_at TIMESTAMP NULL;
+    next_attempt_at = Column(DateTime, nullable=True)
 
 
 class Guest(Base):

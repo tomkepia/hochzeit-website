@@ -3,7 +3,8 @@
     {
       "AllowedOrigins": [
         "http://localhost:3000",
-        "https://your-wedding-domain.com"
+        "https://tomkeundjanpaul.de",
+        "https://www.tomkeundjanpaul.de"
       ],
       "AllowedMethods": ["GET", "PUT"],
       "AllowedHeaders": ["*"],

@@ -6,6 +6,7 @@ import requests
 import zipstream
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
+from botocore.exceptions import ClientError
 from pydantic import BaseModel, field_validator
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -14,12 +15,12 @@ from database import SessionLocal
 from models import Photo
 from routers.auth import require_gallery_access
 from services import storage
-from services.image_processing import trigger_processing
 
 router = APIRouter(prefix="/api/photos", tags=["photos"])
 logger = logging.getLogger(__name__)
 
 ALLOWED_CATEGORIES = {"guest", "photographer"}
+MAX_REGISTER_UPLOAD_SIZE_BYTES = 20 * 1024 * 1024
 
 
 def get_db():
@@ -60,11 +61,6 @@ class PhotoRegisterRequest(BaseModel):
         return v
 
 
-def _trigger_photo_processing(photo_id: str) -> None:
-    """Kept for reference — replaced by image_processing.trigger_processing."""
-    pass  # pragma: no cover
-
-
 @router.post("")
 def register_photo(
     request: PhotoRegisterRequest,
@@ -77,12 +73,33 @@ def register_photo(
     - original_key is the canonical S3 key used for generating signed URLs.
     - original_url is a convenience copy of the non-expiring path (NOT an access URL).
 
-    After a successful DB commit, image processing is triggered asynchronously.
+    The photo is inserted with processing_status='pending'.  The background
+    worker picks it up and runs image processing independently of this request.
     """
     original_url = storage.get_file_url(request.key)
 
     permissions_set = set((token_obj.permissions or "").split(":"))
     effective_category = request.category if "admin" in permissions_set else "guest"
+
+    try:
+        metadata = storage.get_object_metadata(request.key)
+    except ClientError as exc:
+        code = exc.response.get("Error", {}).get("Code", "Unknown")
+        logger.error("Failed to inspect uploaded object %s (ClientError %s): %s", request.key, code, exc)
+        raise HTTPException(status_code=400, detail="Uploaded file not found or inaccessible.")
+    except Exception as exc:
+        logger.error("Failed to inspect uploaded object %s: %s", request.key, exc)
+        raise HTTPException(status_code=500, detail="Could not validate uploaded file.")
+
+    content_length = int(metadata.get("ContentLength", 0) or 0)
+    if content_length <= 0:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+    if content_length > MAX_REGISTER_UPLOAD_SIZE_BYTES:
+        raise HTTPException(status_code=400, detail="File too large (max. 20 MB).")
+
+    raw_content_type = (metadata.get("ContentType") or "").split(";", 1)[0].strip().lower()
+    if raw_content_type not in storage.ALLOWED_CONTENT_TYPES:
+        raise HTTPException(status_code=400, detail="Invalid uploaded file type.")
 
     photo = Photo(
         id=uuid_lib.UUID(request.photoId),
@@ -107,10 +124,7 @@ def register_photo(
         logger.error("DB error registering photo %s: %s", request.photoId, exc)
         raise HTTPException(status_code=500, detail="Failed to register photo.")
 
-    # Trigger async image processing (daemon thread — does not block HTTP response).
-    trigger_processing(request.photoId)
-
-    logger.info("Registered photo id=%s category=%s", request.photoId, effective_category)
+    logger.info("Registered photo id=%s category=%s (pending processing)", request.photoId, effective_category)
     return {"status": "ok"}
 
 
@@ -319,10 +333,10 @@ def list_photos(
     sort: str = "upload",
     db: Session = Depends(get_db),
 ):
-    """Return photos that have completed processing, with signed access URLs.
+    """Return all photos regardless of processing status, with signed access URLs.
 
     Filtering:
-    - Only photos with processing_status = 'done' are returned.
+    - All photos are returned (pending, processing, done, failed).
     - Optionally filter by category ('guest' | 'photographer').
 
     Pagination:
@@ -333,6 +347,7 @@ def list_photos(
     - Backend generates signed URLs for thumbnail, preview, and original.
     - Frontend uses URLs directly — no extra requests needed.
     - All signed URLs expire after 1 hour.
+    - Non-processed photos will have null thumbnail/preview/original URLs.
     """
     if category is not None and category not in ALLOWED_CATEGORIES:
         raise HTTPException(
@@ -343,7 +358,7 @@ def list_photos(
     limit = min(max(1, limit), MAX_LIMIT)
     sort_mode = sort if sort in {"upload", "taken"} else "upload"
 
-    query = db.query(Photo).filter(Photo.processing_status == "done")
+    query = db.query(Photo)
     if category:
         query = query.filter(Photo.category == category)
 
@@ -385,6 +400,9 @@ def list_photos(
             "thumbnailUrl": thumbnail_url,
             "previewUrl": preview_url,
             "originalUrl": original_url,
+            "processingStatus": photo.processing_status,
+            "processingError": photo.processing_error,
+            "processingAttempts": photo.processing_attempts,
         })
 
     return {"photos": result, "hasMore": has_more}

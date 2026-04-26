@@ -125,6 +125,13 @@ def delete_file(key: str) -> None:
     logger.info("Deleted file s3://%s/%s", bucket, key)
 
 
+def get_object_metadata(key: str) -> dict:
+    """Return object metadata for a storage key via head_object."""
+    client = _get_s3_client()
+    bucket = _get_bucket()
+    return client.head_object(Bucket=bucket, Key=key)
+
+
 def check_connection() -> dict:
     """Verify that the S3 connection and bucket are reachable.
 
