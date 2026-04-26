@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { passwordLogin } from '../services/api';
 
 export default function PasswordGate({ children }) {
-  const navigate = useNavigate();
   const [authenticated, setAuthenticated] = useState(false);
   const [input, setInput] = useState('');
   const [error, setError] = useState('');
@@ -24,7 +22,7 @@ export default function PasswordGate({ children }) {
       localStorage.setItem('galleryToken', result.token);
       localStorage.setItem('galleryAccess', 'true');
       localStorage.setItem('galleryPermissions', result.permissions || '');
-      navigate('/gallery');
+      setAuthenticated(true);
     } catch (err) {
       setError('Falsches Passwort. Bitte versuche es erneut.');
     } finally {
