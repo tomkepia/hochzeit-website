@@ -85,6 +85,18 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Copy compose file to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.HETZNER_HOST }}
+          username: ${{ secrets.HETZNER_USER }}
+          password: ${{ secrets.HETZNER_PASSWORD }}
+          source: "docker-compose.prod-shared.yml"
+          target: /opt/hochzeit-website/
+
       - name: Deploy to Multi-App Server
         uses: appleboy/ssh-action@v1.0.0
         with:
@@ -94,9 +106,6 @@ jobs:
           command_timeout: 5m
           script: |
             cd /opt/hochzeit-website
-
-            # Pull latest changes (for compose file updates)
-            git pull origin main
 
             # Update environment variables
             cp .env.production .env
