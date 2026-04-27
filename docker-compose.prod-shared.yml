@@ -59,6 +59,7 @@ services:
       S3_SECRET_KEY: ${S3_SECRET_KEY}
       S3_BUCKET_NAME: ${S3_BUCKET_NAME}
       S3_REGION: ${S3_REGION:-eu-central}
+      LOG_LEVEL: ${WORKER_LOG_LEVEL:-INFO}
     command: python -m worker.image_worker
     networks:
       - hochzeit-network

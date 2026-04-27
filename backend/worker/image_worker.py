@@ -37,6 +37,7 @@ they are eligible to run immediately on the next poll cycle.
 """
 
 import logging
+import os
 import sys
 import time
 from datetime import datetime, timedelta
@@ -63,7 +64,7 @@ INTER_BATCH_SLEEP = 1       # seconds
 # ---------------------------------------------------------------------------
 
 logging.basicConfig(
-    level=logging.INFO,
+    level=getattr(logging, os.getenv("LOG_LEVEL", "INFO").upper(), logging.INFO),
     format="%(asctime)s %(levelname)s [worker] %(message)s",
     stream=sys.stdout,
 )
