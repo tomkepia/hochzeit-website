@@ -78,6 +78,7 @@ jobs:
           tags: ghcr.io/${{ github.repository }}-frontend:latest
           build-args: |
             REACT_APP_API_URL=${{ secrets.REACT_APP_API_URL }}
+            REACT_APP_ADMIN_PASSWORD=${{ secrets.REACT_APP_ADMIN_PASSWORD }}
 
   deploy:
     needs: build-and-push
