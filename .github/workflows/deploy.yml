@@ -42,43 +42,77 @@ jobs:
           pip install -r requirements.txt
           python -m pytest --tb=short || echo "Tests would run here"
 
-  build-and-deploy:
+  build-and-push:
     needs: test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: read
+      packages: write
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Build and push backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          dockerfile: backend/Dockerfile
+          push: true
+          tags: ghcr.io/${{ github.repository }}-backend:latest
 
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          dockerfile: Dockerfile
+          push: true
+          tags: ghcr.io/${{ github.repository }}-frontend:latest
+          build-args: |
+            REACT_APP_API_URL=${{ secrets.REACT_APP_API_URL }}
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
       - name: Deploy to Multi-App Server
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.HETZNER_HOST }}
           username: ${{ secrets.HETZNER_USER }}
           password: ${{ secrets.HETZNER_PASSWORD }}
+          command_timeout: 5m
           script: |
             cd /opt/hochzeit-website
 
-            # Pull latest changes
+            # Pull latest changes (for compose file updates)
             git pull origin main
-
-            # Stop current containers (using SHARED compose file for multi-app setup)
-            docker-compose -f docker-compose.prod-shared.yml down
 
             # Update environment variables
             cp .env.production .env
 
-            # Build and start new containers (using SHARED compose file for multi-app setup)
-            docker-compose -f docker-compose.prod-shared.yml up -d --build
+            # Log in to GHCR and pull pre-built images
+            echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker-compose -f docker-compose.prod-shared.yml pull
+
+            # Start containers (no --build, images are pre-built)
+            docker-compose -f docker-compose.prod-shared.yml up -d
 
             # Clean up old images
             docker image prune -f
 
             # Check deployment status
-            sleep 30
+            sleep 10
             docker-compose -f docker-compose.prod-shared.yml ps
 
             # Health check (using localhost:8001 for multi-app setup)
@@ -88,16 +122,16 @@ jobs:
             echo "${{ secrets.HETZNER_PASSWORD }}" | sudo -S systemctl reload nginx
 
   notify:
-    needs: [test, build-and-deploy]
+    needs: [test, deploy]
     runs-on: ubuntu-latest
     if: always() && (github.ref == 'refs/heads/main' || github.event_name == 'pull_request')
 
     steps:
       - name: Notify deployment status
         run: |
-          if [ "${{ needs.build-and-deploy.result }}" == "success" ]; then
+          if [ "${{ needs.deploy.result }}" == "success" ]; then
             echo "✅ Multi-app deployment successful!"
-          elif [ "${{ needs.build-and-deploy.result }}" == "skipped" ]; then
+          elif [ "${{ needs.deploy.result }}" == "skipped" ]; then
             echo "⏭️ Deployment skipped (PR build — tests only)"
           else
             echo "❌ Multi-app deployment failed!"

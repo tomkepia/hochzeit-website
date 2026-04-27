@@ -22,9 +22,7 @@ services:
 
   # FastAPI Backend
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: ghcr.io/tomkepia/hochzeit-website-backend:latest
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-hochzeit_db}
@@ -52,11 +50,7 @@ services:
 
   # React Frontend
   frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        REACT_APP_API_URL: ${REACT_APP_API_URL:-https://yourdomain.com/api}
+    image: ghcr.io/tomkepia/hochzeit-website-frontend:latest
     restart: unless-stopped
     networks:
       - hochzeit-network
