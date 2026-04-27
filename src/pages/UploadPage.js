@@ -66,6 +66,9 @@ export default function UploadPage() {
           style={styles.nameInput}
           maxLength={80}
         />
+        <p style={styles.nameHint}>
+          💡 Mit deinem Namen können Gäste in der Galerie gezielt nach deinen Fotos filtern.
+        </p>
       </div>
 
       {isAdmin && (
@@ -93,8 +96,8 @@ export default function UploadPage() {
       <UploadArea category={isAdmin ? category : "guest"} uploaderName={uploaderName} />
 
       <div style={styles.footer}>
-        <Link to={backLink} style={styles.backLink}>
-          ← Zurück zur Übersicht
+        <Link to={photosLink} style={styles.backLink}>
+          ← Zur Bildübersicht
         </Link>
       </div>
     </div>
@@ -173,6 +176,13 @@ const styles = {
     backgroundColor: "#fff",
     color: "#333",
     outline: "none",
+  },
+  nameHint: {
+    fontFamily: "'Montserrat', sans-serif",
+    fontSize: 12,
+    color: "#9b8a7a",
+    margin: "6px 0 0",
+    lineHeight: 1.5,
   },
   footer: {
     textAlign: "center",

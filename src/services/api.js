@@ -167,10 +167,13 @@ export function uploadToS3(uploadUrl, file, contentType, onProgress, signal) {
  * server overload (CPU spike during concurrent uploads) does not silently
  * lose a photo that was already successfully uploaded to S3.
  */
-export async function registerPhoto(photoId, key, category, uploadedBy) {
+export async function registerPhoto(photoId, key, category, uploadedBy, takenAt) {
   const body = { photoId, key, category };
   if (uploadedBy && uploadedBy.trim()) {
     body.uploadedBy = uploadedBy.trim();
+  }
+  if (takenAt) {
+    body.takenAt = takenAt;
   }
 
   const MAX_ATTEMPTS = 4;
@@ -214,9 +217,25 @@ export async function registerPhoto(photoId, key, category, uploadedBy) {
  * Fetch processed photos from the gallery.
  * Returns { photos: [...], hasMore: boolean }
  */
-export async function fetchPhotos(category, limit = 50, offset = 0, sortMode = "upload") {
+export async function fetchUploaders(category) {
+  const params = new URLSearchParams();
+  if (category) params.set("category", category);
+
+  const response = await fetch(`${API_BASE}/api/photos/uploaders?${params}`, {
+    headers: { ...getAuthHeaders() },
+  });
+  if (response.status === 401) {
+    handle401();
+    throw new Error("Session expired");
+  }
+  if (!response.ok) throw new Error(`Failed to fetch uploaders (${response.status})`);
+  return response.json(); // { uploaders: string[] }
+}
+
+export async function fetchPhotos(category, limit = 50, offset = 0, sortMode = "upload", uploadedBy = null) {
   const params = new URLSearchParams({ limit, offset });
   if (category) params.set("category", category);
+  if (uploadedBy) params.set("uploaded_by", uploadedBy);
   params.set("sort", sortMode === "taken" ? "taken" : "upload");
 
   const response = await fetch(`${API_BASE}/api/photos?${params}`, {

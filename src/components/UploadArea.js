@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { parse as parseExif } from "exifr";
 import { requestUploadUrl, uploadToS3, registerPhoto, validateFile } from "../services/api";
 
 const MAX_CONCURRENT_UPLOADS = 2;
@@ -34,6 +35,27 @@ function detectTransparency(ctx, width, height) {
   }
 
   return false;
+}
+
+/**
+ * Extract DateTimeOriginal (or DateTime fallback) from the original file
+ * before any canvas re-encode strips the EXIF.
+ * Returns an ISO-8601 string or null.
+ */
+async function extractTakenAt(file) {
+  try {
+    const result = await parseExif(file, ["DateTimeOriginal", "DateTime"]);
+    if (!result) return null;
+    const dt = result.DateTimeOriginal || result.DateTime;
+    if (!dt) return null;
+    // exifr returns a proper JS Date object
+    if (dt instanceof Date && !isNaN(dt.getTime())) {
+      return dt.toISOString();
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 async function resizeImage(file) {
@@ -158,6 +180,9 @@ export default function UploadArea({ category = "guest", uploaderName = "" }) {
     updateEntry(entry.id, { status: "processing", progress: 0, error: null });
 
     try {
+      // Extract EXIF date from the original file BEFORE resize strips it.
+      const takenAt = await extractTakenAt(entry.file);
+
       let processedFile;
       try {
         processedFile = await resizeImage(entry.file);
@@ -194,7 +219,7 @@ export default function UploadArea({ category = "guest", uploaderName = "" }) {
       );
 
       // Step 3: Register in DB only after successful S3 upload
-      await registerPhoto(photoId, key, category, uploaderName);
+      await registerPhoto(photoId, key, category, uploaderName, takenAt);
 
       updateEntry(entry.id, {
         status: "done",
@@ -305,7 +330,12 @@ export default function UploadArea({ category = "guest", uploaderName = "" }) {
       {fileEntries.length > 0 && (
         <div style={styles.actions}>
           {allDone ? (
-            <p style={styles.successMessage}>✓ Alle Fotos wurden hochgeladen!</p>
+            <div style={{ textAlign: "center" }}>
+              <p style={styles.successMessage}>✓ Alle Fotos wurden hochgeladen!</p>
+              <p style={styles.processingHint}>
+                ⏳ Es kann einen kurzen Moment dauern, bis die Bilder in der Galerie erscheinen.
+              </p>
+            </div>
           ) : (
             <div style={styles.actionButtons}>
               <button
@@ -547,5 +577,13 @@ const styles = {
     fontSize: 16,
     color: "#27ae60",
     fontWeight: 600,
+    margin: "0 0 6px",
+  },
+  processingHint: {
+    fontSize: 12,
+    color: "#9b8a7a",
+    margin: 0,
+    lineHeight: 1.5,
+    fontFamily: "'Montserrat', sans-serif",
   },
 };

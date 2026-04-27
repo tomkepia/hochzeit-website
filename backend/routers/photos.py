@@ -1,5 +1,6 @@
 import logging
 import uuid as uuid_lib
+from datetime import datetime
 from collections.abc import Iterator
 
 import requests
@@ -36,6 +37,7 @@ class PhotoRegisterRequest(BaseModel):
     key: str
     category: str
     uploadedBy: str | None = None
+    takenAt: str | None = None  # ISO-8601 client-side EXIF date (optional)
 
     @field_validator("photoId")
     @classmethod
@@ -101,6 +103,19 @@ def register_photo(
     if raw_content_type not in storage.ALLOWED_CONTENT_TYPES:
         raise HTTPException(status_code=400, detail="Invalid uploaded file type.")
 
+    # Parse client-provided EXIF timestamp (ISO-8601). Validated loosely —
+    # if it's malformed we simply ignore it; the worker may fill it later.
+    client_taken_at: datetime | None = None
+    if request.takenAt:
+        try:
+            client_taken_at = datetime.fromisoformat(request.takenAt.replace("Z", "+00:00"))
+            # Store as naive UTC to match the rest of the DB convention
+            if client_taken_at.tzinfo is not None:
+                from datetime import timezone
+                client_taken_at = client_taken_at.astimezone(timezone.utc).replace(tzinfo=None)
+        except Exception:
+            client_taken_at = None
+
     photo = Photo(
         id=uuid_lib.UUID(request.photoId),
         original_key=request.key,
@@ -110,6 +125,7 @@ def register_photo(
         category=effective_category,
         uploaded_by=request.uploadedBy,
         processing_status="pending",
+        taken_at=client_taken_at,
     )
 
     try:
@@ -325,9 +341,29 @@ def download_zip(
     )
 
 
+@router.get("/uploaders", dependencies=[Depends(require_gallery_access())])
+def list_uploaders(
+    category: str | None = None,
+    db: Session = Depends(get_db),
+):
+    """Return the sorted list of distinct non-null uploader names for the given category."""
+    if category is not None and category not in ALLOWED_CATEGORIES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid category '{category}'. Must be one of: {sorted(ALLOWED_CATEGORIES)}",
+        )
+
+    query = db.query(Photo.uploaded_by).filter(Photo.uploaded_by.isnot(None), Photo.uploaded_by != "")
+    if category:
+        query = query.filter(Photo.category == category)
+    rows = query.distinct().order_by(Photo.uploaded_by.asc()).all()
+    return {"uploaders": [r[0] for r in rows]}
+
+
 @router.get("", dependencies=[Depends(require_gallery_access())])
 def list_photos(
     category: str | None = None,
+    uploaded_by: str | None = None,
     limit: int = 50,
     offset: int = 0,
     sort: str = "upload",
@@ -338,6 +374,7 @@ def list_photos(
     Filtering:
     - All photos are returned (pending, processing, done, failed).
     - Optionally filter by category ('guest' | 'photographer').
+    - Optionally filter by uploader name (exact match, case-sensitive).
 
     Pagination:
     - Offset-based; default limit 50, max 100.
@@ -361,6 +398,8 @@ def list_photos(
     query = db.query(Photo)
     if category:
         query = query.filter(Photo.category == category)
+    if uploaded_by:
+        query = query.filter(Photo.uploaded_by == uploaded_by)
 
     # Fetch one extra row to determine whether more pages exist.
     # Secondary sort by id ensures stable ordering when created_at timestamps collide.
@@ -397,6 +436,7 @@ def list_photos(
             "category": photo.category,
             "uploadedBy": photo.uploaded_by,
             "createdAt": photo.created_at.isoformat() if photo.created_at else None,
+            "takenAt": photo.taken_at.isoformat() if photo.taken_at else None,
             "thumbnailUrl": thumbnail_url,
             "previewUrl": preview_url,
             "originalUrl": original_url,

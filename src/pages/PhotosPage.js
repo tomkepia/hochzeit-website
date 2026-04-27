@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { downloadZip, fetchPhotos, deletePhoto, bulkDeletePhotos, retryPhoto, fetchProcessingStats } from "../services/api";
+import { downloadZip, fetchPhotos, fetchUploaders, deletePhoto, bulkDeletePhotos, retryPhoto, fetchProcessingStats } from "../services/api";
 import PhotoGrid from "../components/PhotoGrid";
 import LightboxViewer from "../components/LightboxViewer";
 
@@ -68,6 +68,8 @@ export default function PhotosPage() {
   const [toastMessage, setToastMessage] = useState(null);
   const [processingStats, setProcessingStats] = useState(null);
   const [retryingPhotoIds, setRetryingPhotoIds] = useState(() => new Set());
+  const [uploadedBy, setUploadedBy] = useState(null);   // null = no filter
+  const [uploaderOptions, setUploaderOptions] = useState([]);
 
   // Refs for values that must be read inside IntersectionObserver without stale closures
   const offsetRef = useRef(0);
@@ -75,6 +77,7 @@ export default function PhotosPage() {
   const loadingRef = useRef(false);
   const categoryRef = useRef(category);
   const sortRef = useRef(sortMode);
+  const uploadedByRef = useRef(uploadedBy);
   const sentinelRef = useRef(null);
   const toastTimeoutRef = useRef(null);
   const lastFetchedAtRef = useRef(0);
@@ -105,14 +108,14 @@ export default function PhotosPage() {
     return () => clearInterval(interval);
   }, [isAdmin, loadStats]);
 
-  const doLoad = useCallback(async (cat, off, replace, sort) => {
+  const doLoad = useCallback(async (cat, off, replace, sort, uploader) => {
     if (loadingRef.current) return;
     loadingRef.current = true;
     setLoading(true);
     try {
-      const data = await fetchPhotos(cat, LIMIT, off, sort);
-      // Discard responses that arrived after a category/sort switch.
-      if (cat !== categoryRef.current || sort !== sortRef.current) return;
+      const data = await fetchPhotos(cat, LIMIT, off, sort, uploader);
+      // Discard responses that arrived after a category/sort/filter switch.
+      if (cat !== categoryRef.current || sort !== sortRef.current || uploader !== uploadedByRef.current) return;
       const batch = data.photos || [];
       setPhotos((prev) => (replace ? batch : [...prev, ...batch]));
       hasMoreRef.current = data.hasMore;
@@ -120,7 +123,7 @@ export default function PhotosPage() {
       offsetRef.current = off + batch.length;
       lastFetchedAtRef.current = Date.now();
     } catch {
-      if (cat === categoryRef.current && sort === sortRef.current) {
+      if (cat === categoryRef.current && sort === sortRef.current && uploader === uploadedByRef.current) {
         setError("Fotos konnten nicht geladen werden. Bitte Seite neu laden.");
       }
     } finally {
@@ -140,12 +143,13 @@ export default function PhotosPage() {
     try {
       do {
         // eslint-disable-next-line no-await-in-loop
-        const data = await fetchPhotos(categoryRef.current, LIMIT, nextOffset, sortRef.current);
+        const data = await fetchPhotos(categoryRef.current, LIMIT, nextOffset, sortRef.current, uploadedByRef.current);
         const batch = data.photos || [];
 
         if (
           categoryRef.current !== category ||
-          sortRef.current !== sortMode
+          sortRef.current !== sortMode ||
+          uploadedByRef.current !== uploadedBy
         ) {
           return;
         }
@@ -163,7 +167,7 @@ export default function PhotosPage() {
     } catch {
       // Silent by design: background polling should not replace current UI with an error state.
     }
-  }, [category, photos.length, sortMode]);
+  }, [category, photos.length, sortMode, uploadedBy]);
 
   // Photos that have finished processing — used to drive the lightbox.
   const donePhotos = useMemo(
@@ -353,7 +357,7 @@ export default function PhotosPage() {
 
       while (more) {
         // eslint-disable-next-line no-await-in-loop
-        const data = await fetchPhotos(categoryRef.current, LIMIT, off, sortRef.current);
+        const data = await fetchPhotos(categoryRef.current, LIMIT, off, sortRef.current, uploadedByRef.current);
         const batch = data.photos || [];
 
         for (const photo of batch) {
@@ -439,6 +443,17 @@ export default function PhotosPage() {
   }, [sortMode]);
 
   useEffect(() => {
+    uploadedByRef.current = uploadedBy;
+  }, [uploadedBy]);
+
+  // Reload available uploader names whenever the category changes.
+  useEffect(() => {
+    fetchUploaders(category)
+      .then((data) => setUploaderOptions(data.uploaders || []))
+      .catch(() => setUploaderOptions([]));
+  }, [category]);
+
+  useEffect(() => {
     const current = searchParams.get("sort") === "taken" ? "taken" : "upload";
     if (current === sortMode) return;
 
@@ -451,10 +466,11 @@ export default function PhotosPage() {
     setSearchParams(nextParams, { replace: true });
   }, [searchParams, setSearchParams, sortMode]);
 
-  // Reset state and trigger initial load when category or sort changes.
+  // Reset state and trigger initial load when category, sort, or uploader filter changes.
   useEffect(() => {
     categoryRef.current = category;
     sortRef.current = sortMode;
+    uploadedByRef.current = uploadedBy;
     offsetRef.current = 0;
     hasMoreRef.current = true;
     setPhotos([]);
@@ -463,8 +479,8 @@ export default function PhotosPage() {
     setSelectionMode(false);
     setSelectedPhotoIds(new Set());
     setLightboxIndex(-1);
-    doLoad(category, 0, true, sortMode);
-  }, [category, doLoad, sortMode]);
+    doLoad(category, 0, true, sortMode, uploadedBy);
+  }, [category, doLoad, sortMode, uploadedBy]);
 
   // Infinite scroll: observe a sentinel element at the bottom of the grid
   useEffect(() => {
@@ -474,7 +490,7 @@ export default function PhotosPage() {
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting && hasMoreRef.current && !loadingRef.current) {
-          doLoad(categoryRef.current, offsetRef.current, false, sortRef.current);
+          doLoad(categoryRef.current, offsetRef.current, false, sortRef.current, uploadedByRef.current);
         }
       },
       { rootMargin: "400px" } // start loading well before the user hits the bottom
@@ -493,7 +509,7 @@ export default function PhotosPage() {
       offsetRef.current = 0;
       hasMoreRef.current = true;
       setHasMore(true);
-      doLoad(categoryRef.current, 0, true, sortRef.current);
+      doLoad(categoryRef.current, 0, true, sortRef.current, uploadedByRef.current);
     };
 
     window.addEventListener("focus", onFocus);
@@ -586,7 +602,7 @@ export default function PhotosPage() {
             return (
               <button
                 key={tab.key}
-                onClick={() => setCategory(tab.key)}
+                onClick={() => { setCategory(tab.key); setUploadedBy(null); }}
                 style={{
                   padding: "10px 24px",
                   borderRadius: 9999,
@@ -656,6 +672,63 @@ export default function PhotosPage() {
             </button>
           </div>
         </div>
+
+        {/* Uploader filter */}
+        {uploaderOptions.length > 0 && (
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              gap: 8,
+              marginBottom: 12,
+              fontSize: 14,
+              color: "#5c4a3c",
+              flexWrap: "wrap",
+            }}
+          >
+            <span style={{ fontWeight: 500 }}>Person:</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+              <button
+                onClick={() => setUploadedBy(null)}
+                aria-pressed={uploadedBy === null}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  padding: "4px 6px",
+                  fontSize: 14,
+                  color: uploadedBy === null ? "#5c4a3c" : "#8b7355",
+                  fontWeight: uploadedBy === null ? 600 : 400,
+                  textDecoration: uploadedBy === null ? "underline" : "none",
+                  cursor: "pointer",
+                }}
+              >
+                Alle
+              </button>
+              {uploaderOptions.map((name, i) => (
+                <React.Fragment key={name}>
+                  <span style={{ opacity: 0.5 }}>|</span>
+                  <button
+                    onClick={() => setUploadedBy(name)}
+                    aria-pressed={uploadedBy === name}
+                    style={{
+                      background: "transparent",
+                      border: "none",
+                      padding: "4px 6px",
+                      fontSize: 14,
+                      color: uploadedBy === name ? "#5c4a3c" : "#8b7355",
+                      fontWeight: uploadedBy === name ? 600 : 400,
+                      textDecoration: uploadedBy === name ? "underline" : "none",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {name}
+                  </button>
+                </React.Fragment>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Admin processing stats panel */}
         {isAdmin && processingStats && (
@@ -865,6 +938,7 @@ export default function PhotosPage() {
               onDelete={handleDelete}
               onRetry={handleRetry}
               retryingPhotoIds={retryingPhotoIds}
+              sortMode={sortMode}
             />
           </div>
         )}

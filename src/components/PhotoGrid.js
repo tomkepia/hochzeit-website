@@ -3,7 +3,7 @@ import React from "react";
 /**
  * Responsive photo grid.
  * Props:
- *   photos      – array of { id, thumbnailUrl, uploadedBy, processingStatus, processingError, processingAttempts }
+ *   photos      – array of { id, thumbnailUrl, uploadedBy, processingStatus, processingError, processingAttempts, takenAt }
  *   onPhotoClick(index) – called when a done thumbnail is clicked
  *   selectionMode – whether grid should select instead of open lightbox
  *   selectedPhotoIds – Set<string> of selected photo IDs
@@ -11,6 +11,8 @@ import React from "react";
  *   isAdmin – whether to show admin delete/retry buttons
  *   onDelete(photoId) – called when admin clicks delete
  *   onRetry(photoId) – called when admin clicks retry on a failed photo
+ *   sortMode – "upload" | "taken"; when "taken", a divider is shown before
+ *              the first photo without a capture date
  */
 export default function PhotoGrid({
   photos,
@@ -22,8 +24,15 @@ export default function PhotoGrid({
   onDelete,
   onRetry,
   retryingPhotoIds = new Set(),
+  sortMode = "upload",
 }) {
   if (!photos || photos.length === 0) return null;
+
+  // Index of the first photo that has no takenAt — used to insert the divider.
+  const firstNullTakenAtIndex =
+    sortMode === "taken"
+      ? photos.findIndex((p) => !p.takenAt)
+      : -1;
 
   return (
     <div
@@ -43,8 +52,34 @@ export default function PhotoGrid({
         const failedMessage = isAdmin ? "Fehlgeschlagen" : "Fehler bei Verarbeitung";
 
         return (
+          <React.Fragment key={photo.id}>
+            {index === firstNullTakenAtIndex && (
+              <div
+                style={{
+                  gridColumn: "1 / -1",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "10px 2px 6px",
+                }}
+              >
+                <div style={{ flex: 1, height: 1, background: "#d4c9bc" }} />
+                <span
+                  style={{
+                    fontSize: 11,
+                    color: "#a0907e",
+                    whiteSpace: "nowrap",
+                    fontFamily: "'Montserrat', sans-serif",
+                    letterSpacing: "0.04em",
+                  }}
+                >
+                  Kein Aufnahmedatum verfügbar
+                </span>
+                <div style={{ flex: 1, height: 1, background: "#d4c9bc" }} />
+              </div>
+            )}
           <button
-            key={photo.id}
+            key={`btn-${photo.id}`}
             onClick={() => {
               if (!isDone) return;
               if (selectionMode) {
@@ -198,6 +233,7 @@ export default function PhotoGrid({
               </button>
             )}
           </button>
+          </React.Fragment>
         );
       })}
     </div>

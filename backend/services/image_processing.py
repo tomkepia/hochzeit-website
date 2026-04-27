@@ -61,16 +61,37 @@ def extract_taken_at(img: Image.Image) -> Optional[datetime]:
     """Extract capture timestamp from image EXIF metadata when available.
 
     Preference order:
-      1. DateTimeOriginal — shutter-press time; most accurate.
-      2. DateTime         — fallback for edited images that strip DateTimeOriginal
-                           but retain the baseline DateTime tag.
+      1. DateTimeOriginal from the Exif sub-IFD (0x8769) — shutter-press time;
+         this is where iOS, Android and all EXIF-compliant cameras write it.
+      2. DateTimeOriginal from IFD0 — uncommon but possible.
+      3. DateTime from IFD0 — fallback for edited images that only retain the
+         baseline DateTime tag.
     Returns None when neither tag is present or parseable.
+
+    Note: Pillow's getexif() only returns IFD0 tags in its flat dict; sub-IFD
+    tags (including DateTimeOriginal, tag 36867) must be read via get_ifd().
     """
+    # Tag number for the Exif sub-IFD pointer stored in IFD0.
+    EXIF_IFD_TAG = 0x8769  # 34665
+
     try:
         exif = img.getexif()
         if not exif:
             return None
 
+        # 1. Check Exif sub-IFD first — this is the canonical location for
+        #    DateTimeOriginal on all modern cameras and smartphones.
+        try:
+            exif_ifd = exif.get_ifd(EXIF_IFD_TAG)
+            for tag, value in exif_ifd.items():
+                if TAGS.get(tag) == "DateTimeOriginal":
+                    result = parse_exif_datetime(value)
+                    if result:
+                        return result
+        except Exception:
+            pass
+
+        # 2 & 3. Fall back to scanning IFD0 for DateTimeOriginal or DateTime.
         date_time_original: Optional[datetime] = None
         date_time_fallback: Optional[datetime] = None
 
@@ -173,7 +194,10 @@ def _process_photo(photo_id: str) -> None:
         photo.preview_url = preview_url
         photo.thumbnail_key = thumb_key
         photo.thumbnail_url = thumb_url
-        photo.taken_at = taken_at
+        # Only fill taken_at when the client didn't already provide it
+        # (client-side EXIF extraction is more reliable for resized uploads).
+        if photo.taken_at is None:
+            photo.taken_at = taken_at
         db.commit()
 
         elapsed = time.monotonic() - start_time
