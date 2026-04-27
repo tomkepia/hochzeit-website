@@ -95,8 +95,16 @@ jobs:
           script: |
             cd /opt/hochzeit-website
 
+            # Sync only the files that the pipeline manages (avoids full git pull instability)
+            git fetch origin main
+            git checkout FETCH_HEAD -- docker-compose.prod-shared.yml nginx/conf.d/default.conf
+
             # Update environment variables
             cp .env.production .env
+
+            # Apply updated nginx config to host nginx
+            echo "${{ secrets.HETZNER_PASSWORD }}" | sudo -S cp /opt/hochzeit-website/nginx/conf.d/default.conf /etc/nginx/sites-available/hochzeit-website
+            echo "${{ secrets.HETZNER_PASSWORD }}" | sudo -S nginx -t && echo "${{ secrets.HETZNER_PASSWORD }}" | sudo -S systemctl reload nginx || echo "nginx config invalid — skipping reload"
 
             # Log in to GHCR and pull pre-built images
             echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
@@ -112,11 +120,8 @@ jobs:
             sleep 10
             docker-compose -f docker-compose.prod-shared.yml ps
 
-            # Health check (using localhost:8001 for multi-app setup)
+            # Health check
             curl -f http://localhost:8001/ || echo "Backend health check failed"
-
-            # Reload nginx to ensure configuration is up to date
-            echo "${{ secrets.HETZNER_PASSWORD }}" | sudo -S systemctl reload nginx
 
   notify:
     needs: [test, deploy]

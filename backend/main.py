@@ -75,7 +75,7 @@ class GuestCreate(BaseModel):
     unterkunft: str | None = None
 
 # Endpoint to receive RSVP form data
-@app.post("/rsvp")
+@app.post("/api/rsvp")
 def create_guest(guest: GuestCreate, db: Session = Depends(get_db)):
     db_guest = Guest(**guest.dict())
     db.add(db_guest)
@@ -84,13 +84,13 @@ def create_guest(guest: GuestCreate, db: Session = Depends(get_db)):
     return {"success": True, "id": db_guest.id}
 
 # Admin endpoint to get all guests
-@app.get("/admin/guests")
+@app.get("/api/admin/guests")
 def get_all_guests(db: Session = Depends(get_db)):
     guests = db.query(Guest).order_by(Guest.id.desc()).all()
     return guests
 
 # Admin endpoint to delete a guest
-@app.delete("/admin/guests/{guest_id}")
+@app.delete("/api/admin/guests/{guest_id}")
 def delete_guest(guest_id: int, db: Session = Depends(get_db)):
     guest = db.query(Guest).filter(Guest.id == guest_id).first()
     if guest is None:
@@ -101,7 +101,7 @@ def delete_guest(guest_id: int, db: Session = Depends(get_db)):
     return {"success": True, "message": "Guest deleted successfully"}
 
 # Admin endpoint to update a guest
-@app.put("/admin/guests/{guest_id}")
+@app.put("/api/admin/guests/{guest_id}")
 def update_guest(guest_id: int, guest: GuestCreate, db: Session = Depends(get_db)):
     db_guest = db.query(Guest).filter(Guest.id == guest_id).first()
     if db_guest is None:
@@ -116,7 +116,7 @@ def update_guest(guest_id: int, guest: GuestCreate, db: Session = Depends(get_db
     return {"success": True, "guest": db_guest}
 
 # Admin endpoint to export guests as Excel
-@app.get("/admin/guests/export")
+@app.get("/api/admin/guests/export")
 def export_guests(db: Session = Depends(get_db)):
     guests = db.query(Guest).order_by(Guest.id.desc()).all()
     

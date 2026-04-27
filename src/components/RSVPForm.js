@@ -55,7 +55,7 @@ const handleSubmit = async (e) => {
   // In development you can set REACT_APP_API_URL=http://localhost:8000
   // In production the frontend is served from the same origin and nginx proxies
   // /api to the backend, so default to the proxied path '/api'.
-  const apiUrl = process.env.REACT_APP_API_URL || "/api";
+  const apiUrl = process.env.REACT_APP_API_URL || "";
 
     let allSuccess = true;
     for (const person of persons) {
@@ -66,7 +66,7 @@ const handleSubmit = async (e) => {
         ...sharedFields,
       };
       try {
-        const res = await fetch(`${apiUrl}/rsvp`, {
+        const res = await fetch(`${apiUrl}/api/rsvp`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(guestData),
