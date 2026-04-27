@@ -13,6 +13,13 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 logger = logging.getLogger(__name__)
 
 
+def _client_meta(request: Request) -> str:
+    """Return compact client metadata for auth logs."""
+    ip = request.client.host if request.client else "unknown"
+    ua = request.headers.get("user-agent", "unknown")
+    return f"ip={ip} ua={ua}"
+
+
 def get_db():
     db = SessionLocal()
     try:
@@ -30,24 +37,38 @@ class PasswordLoginRequest(BaseModel):
 
 
 @router.post("/token-login")
-def token_login(request: TokenRequest, db: Session = Depends(get_db)):
+def token_login(payload: TokenRequest, request: Request, db: Session = Depends(get_db)):
     """Validate a QR access token. Returns {"status": "ok", "permissions": "..."} on success."""
-    token_obj = db.query(AccessToken).filter(AccessToken.token == request.token).first()
+    token_obj = db.query(AccessToken).filter(AccessToken.token == payload.token).first()
 
     if not token_obj:
+        logger.warning("token-login failed: invalid token (%s)", _client_meta(request))
         raise HTTPException(status_code=401, detail="Invalid token")
 
     if token_obj.expires_at < datetime.utcnow():
+        logger.info("token-login failed: expired token id=%s (%s)", token_obj.id, _client_meta(request))
         raise HTTPException(status_code=401, detail="Token expired")
+
+    logger.info(
+        "token-login success token_id=%s permissions=%s (%s)",
+        token_obj.id,
+        token_obj.permissions or "",
+        _client_meta(request),
+    )
 
     return {"status": "ok", "permissions": token_obj.permissions or ""}
 
 
 @router.post("/password-login")
-def password_login(request: PasswordLoginRequest, db: Session = Depends(get_db)):
+def password_login(payload: PasswordLoginRequest, request: Request, db: Session = Depends(get_db)):
     """Exchange the gallery password for a valid access token."""
     expected = os.getenv("GALLERY_PASSWORD")
-    if not expected or request.password != expected:
+    if not expected:
+        logger.error("password-login failed: GALLERY_PASSWORD missing (%s)", _client_meta(request))
+        raise HTTPException(status_code=500, detail="Gallery login not configured")
+
+    if payload.password != expected:
+        logger.warning("password-login failed: invalid password (%s)", _client_meta(request))
         raise HTTPException(status_code=401, detail="Invalid password")
 
     now = datetime.utcnow()
@@ -60,8 +81,15 @@ def password_login(request: PasswordLoginRequest, db: Session = Depends(get_db))
     )
 
     if not token_obj:
-        logger.warning("password-login succeeded but no valid token exists in DB")
+        logger.warning("password-login failed: no valid upload:view token in DB (%s)", _client_meta(request))
         raise HTTPException(status_code=500, detail="No valid gallery token available")
+
+    logger.info(
+        "password-login success token_id=%s expires_at=%s (%s)",
+        token_obj.id,
+        token_obj.expires_at.isoformat(),
+        _client_meta(request),
+    )
 
     return {
         "token": token_obj.token,
