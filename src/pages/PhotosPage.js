@@ -68,7 +68,8 @@ export default function PhotosPage() {
   const [toastMessage, setToastMessage] = useState(null);
   const [processingStats, setProcessingStats] = useState(null);
   const [retryingPhotoIds, setRetryingPhotoIds] = useState(() => new Set());
-  const [uploadedBy, setUploadedBy] = useState(null);   // null = no filter
+  const [uploadedBy, setUploadedBy] = useState(null);   // null = no filter (committed)
+  const [uploaderInput, setUploaderInput] = useState(""); // live text field value
   const [uploaderOptions, setUploaderOptions] = useState([]);
 
   // Refs for values that must be read inside IntersectionObserver without stale closures
@@ -602,7 +603,7 @@ export default function PhotosPage() {
             return (
               <button
                 key={tab.key}
-                onClick={() => { setCategory(tab.key); setUploadedBy(null); }}
+                onClick={() => { setCategory(tab.key); setUploadedBy(null); setUploaderInput(""); }}
                 style={{
                   padding: "10px 24px",
                   borderRadius: 9999,
@@ -684,49 +685,87 @@ export default function PhotosPage() {
               marginBottom: 12,
               fontSize: 14,
               color: "#5c4a3c",
-              flexWrap: "wrap",
             }}
           >
-            <span style={{ fontWeight: 500 }}>Person:</span>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-              <button
-                onClick={() => setUploadedBy(null)}
-                aria-pressed={uploadedBy === null}
-                style={{
-                  background: "transparent",
-                  border: "none",
-                  padding: "4px 6px",
-                  fontSize: 14,
-                  color: uploadedBy === null ? "#5c4a3c" : "#8b7355",
-                  fontWeight: uploadedBy === null ? 600 : 400,
-                  textDecoration: uploadedBy === null ? "underline" : "none",
-                  cursor: "pointer",
+            <label
+              htmlFor="uploaderFilter"
+              style={{ fontWeight: 500, whiteSpace: "nowrap" }}
+            >
+              Person:
+            </label>
+            <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+              <input
+                id="uploaderFilter"
+                list="uploaderSuggestions"
+                type="search"
+                placeholder="Name eingeben…"
+                value={uploaderInput}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setUploaderInput(val);
+                  // Commit immediately when the value exactly matches a known name
+                  // (user picked from the datalist) or is empty (cleared).
+                  if (val === "" ) {
+                    setUploadedBy(null);
+                  } else if (uploaderOptions.includes(val)) {
+                    setUploadedBy(val);
+                  }
                 }}
-              >
-                Alle
-              </button>
-              {uploaderOptions.map((name, i) => (
-                <React.Fragment key={name}>
-                  <span style={{ opacity: 0.5 }}>|</span>
-                  <button
-                    onClick={() => setUploadedBy(name)}
-                    aria-pressed={uploadedBy === name}
-                    style={{
-                      background: "transparent",
-                      border: "none",
-                      padding: "4px 6px",
-                      fontSize: 14,
-                      color: uploadedBy === name ? "#5c4a3c" : "#8b7355",
-                      fontWeight: uploadedBy === name ? 600 : 400,
-                      textDecoration: uploadedBy === name ? "underline" : "none",
-                      cursor: "pointer",
-                    }}
-                  >
-                    {name}
-                  </button>
-                </React.Fragment>
-              ))}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    const trimmed = uploaderInput.trim();
+                    setUploadedBy(trimmed || null);
+                    e.target.blur();
+                  }
+                  if (e.key === "Escape") {
+                    setUploaderInput("");
+                    setUploadedBy(null);
+                    e.target.blur();
+                  }
+                }}
+                style={{
+                  padding: "6px 28px 6px 10px",
+                  fontSize: 14,
+                  fontFamily: "'Montserrat', sans-serif",
+                  border: uploadedBy ? "1px solid #8b7355" : "1px solid #d5c8b8",
+                  borderRadius: 9999,
+                  background: uploadedBy ? "#f5f0ea" : "#fff",
+                  color: "#3c3228",
+                  outline: "none",
+                  width: 180,
+                  boxSizing: "border-box",
+                }}
+              />
+              <datalist id="uploaderSuggestions">
+                {uploaderOptions.map((name) => (
+                  <option key={name} value={name} />
+                ))}
+              </datalist>
+              {uploaderInput && (
+                <button
+                  onClick={() => { setUploaderInput(""); setUploadedBy(null); }}
+                  aria-label="Filter zurücksetzen"
+                  style={{
+                    position: "absolute",
+                    right: 8,
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    color: "#a0907e",
+                    fontSize: 14,
+                    lineHeight: 1,
+                    padding: 0,
+                  }}
+                >
+                  ✕
+                </button>
+              )}
             </div>
+            {uploadedBy && (
+              <span style={{ fontSize: 12, color: "#8b7355", whiteSpace: "nowrap" }}>
+                gefiltert
+              </span>
+            )}
           </div>
         )}
 
