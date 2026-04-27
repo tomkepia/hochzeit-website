@@ -236,6 +236,9 @@ def run_worker() -> None:
                 db.rollback()
             except Exception:
                 pass
+            # Avoid tight-loop CPU burn when a persistent error occurs
+            # (e.g. database temporarily unavailable).
+            time.sleep(POLL_INTERVAL)
         finally:
             db.close()
 

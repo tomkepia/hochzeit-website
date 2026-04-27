@@ -65,7 +65,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ./backend
-          dockerfile: backend/Dockerfile
+          file: backend/Dockerfile
           push: true
           tags: ghcr.io/${{ github.repository }}-backend:latest
 
@@ -73,7 +73,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          dockerfile: Dockerfile
+          file: Dockerfile
           push: true
           tags: ghcr.io/${{ github.repository }}-frontend:latest
           build-args: |
@@ -103,7 +103,7 @@ jobs:
             docker-compose -f docker-compose.prod-shared.yml pull
 
             # Start containers (no --build, images are pre-built)
-            docker-compose -f docker-compose.prod-shared.yml up -d
+            docker-compose -f docker-compose.prod-shared.yml up -d --remove-orphans
 
             # Clean up old images
             docker image prune -f
