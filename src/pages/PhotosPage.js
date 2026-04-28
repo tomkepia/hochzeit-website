@@ -551,6 +551,23 @@ export default function PhotosPage() {
     return () => observer.disconnect();
   }, [doLoad]);
 
+  // Safari fallback: IntersectionObserver is unreliable in Safari/iOS (address bar
+  // collapse changes viewport height, initial intersection events can be missed).
+  // A passive scroll listener catches what the observer misses.
+  useEffect(() => {
+    const handleScroll = () => {
+      if (!hasMoreRef.current || loadingRef.current) return;
+      const scrollBottom = window.scrollY + window.innerHeight;
+      const docHeight = document.documentElement.scrollHeight;
+      if (scrollBottom >= docHeight - 600) {
+        doLoad(categoryRef.current, offsetRef.current, false, sortRef.current, uploadedByRef.current);
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [doLoad]);
+
   // Optional freshness polish: refresh signed URLs when returning after long inactivity.
   useEffect(() => {
     const onFocus = () => {
