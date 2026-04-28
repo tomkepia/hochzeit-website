@@ -39,6 +39,9 @@ PREVIEW_MAX_PX = 1200
 PREVIEW_JPEG_QUALITY = 80
 THUMBNAIL_MAX_PX = 300
 THUMBNAIL_JPEG_QUALITY = 70
+# Keep originals untouched in object storage, but cap processing dimensions
+# to prevent excessive RAM usage on very large images.
+PROCESSING_SOURCE_MAX_PX = 3000
 
 # Pre-signed download URLs expire in 1 hour; processing happens within seconds.
 DOWNLOAD_TIMEOUT_SECONDS = 60
@@ -167,8 +170,11 @@ def _process_photo(photo_id: str) -> None:
         # Open and process image
         try:
             img = Image.open(BytesIO(image_data))
+            # Free the raw byte buffer as soon as Pillow has decoded the image.
+            image_data = None
             taken_at = extract_taken_at(img)
             img = ImageOps.exif_transpose(img)  # fix EXIF rotation
+            img = _downscale_processing_source(img)
         except Exception as exc:
             raise RuntimeError(f"Failed to open image: {exc}") from exc
 
@@ -250,6 +256,32 @@ def _download_with_retry(key: str) -> Optional[bytes]:
                 time.sleep(RETRY_DELAY_SECONDS)
 
     return None
+
+
+def _downscale_processing_source(img: Image.Image) -> Image.Image:
+    """Return an image suitable for processing while keeping original file untouched.
+
+    The original upload stays in object storage. This only limits the in-memory
+    working image dimensions to reduce RAM and CPU pressure in the worker.
+    """
+    width, height = img.size
+    max_side = max(width, height)
+    if max_side <= PROCESSING_SOURCE_MAX_PX:
+        return img
+
+    scale = PROCESSING_SOURCE_MAX_PX / float(max_side)
+    new_size = (
+        max(1, int(width * scale)),
+        max(1, int(height * scale)),
+    )
+    logger.info(
+        "Downscaling processing source from %sx%s to %sx%s",
+        width,
+        height,
+        new_size[0],
+        new_size[1],
+    )
+    return img.resize(new_size, Image.LANCZOS)
 
 
 def _generate_and_upload_variant(

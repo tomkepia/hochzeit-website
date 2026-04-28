@@ -3,6 +3,11 @@ services:
   db:
     image: postgres:15-alpine
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
       POSTGRES_DB: hochzeit_db
       POSTGRES_USER: postgres
@@ -21,6 +26,11 @@ services:
   backend:
     build: ./backend
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
       DATABASE_URL: postgresql://postgres:password@db:5432/hochzeit_db
       S3_ENDPOINT: ${S3_ENDPOINT}
@@ -42,6 +52,11 @@ services:
   worker:
     build: ./backend
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
       DATABASE_URL: postgresql://postgres:password@db:5432/hochzeit_db
       S3_ENDPOINT: ${S3_ENDPOINT}
@@ -63,6 +78,11 @@ services:
       args:
         REACT_APP_API_URL: http://localhost:8000
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     ports:
       - "3000:80"
     depends_on:

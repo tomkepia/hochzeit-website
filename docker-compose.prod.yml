@@ -3,6 +3,11 @@ services:
   db:
     image: postgres:15-alpine
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-hochzeit_db}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
@@ -24,6 +29,11 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-hochzeit_db}
       ENVIRONMENT: production
@@ -46,6 +56,11 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-hochzeit_db}
       S3_ENDPOINT: ${S3_ENDPOINT}
@@ -68,6 +83,11 @@ services:
       args:
         REACT_APP_API_URL: ${REACT_APP_API_URL:-https://yourdomain.com/api}
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - app-network
     depends_on:
@@ -78,6 +98,11 @@ services:
   nginx:
     image: nginx:alpine
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     ports:
       - "80:80"
       - "443:443"
@@ -97,6 +122,11 @@ services:
   certbot:
     image: certbot/certbot
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     volumes:
       - ./certbot/conf:/etc/letsencrypt
       - ./certbot/www:/var/www/certbot

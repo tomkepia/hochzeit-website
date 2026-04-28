@@ -3,6 +3,11 @@ services:
   db:
     image: postgres:15-alpine
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-hochzeit_db}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
@@ -24,6 +29,11 @@ services:
   backend:
     image: ghcr.io/tomkepia/hochzeit-website-backend:latest
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-hochzeit_db}
       ENVIRONMENT: production
@@ -52,6 +62,11 @@ services:
   worker:
     image: ghcr.io/tomkepia/hochzeit-website-backend:latest
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-hochzeit_db}
       S3_ENDPOINT: ${S3_ENDPOINT}
@@ -71,6 +86,11 @@ services:
   frontend:
     image: ghcr.io/tomkepia/hochzeit-website-frontend:latest
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - hochzeit-network
     ports:
