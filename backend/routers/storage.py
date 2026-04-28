@@ -18,7 +18,7 @@ ALLOWED_CONTENT_TYPES = {
     "image/heic",
     "image/heif",
 }
-MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024
+MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024
 
 # Maps MIME type → canonical file extension for original uploads
 CONTENT_TYPE_EXTENSIONS = {
@@ -60,7 +60,7 @@ def get_upload_url(request: UploadUrlRequest):
         if request.fileSize < 0:
             raise HTTPException(status_code=400, detail="Invalid file size")
         if request.fileSize > MAX_FILE_SIZE_BYTES:
-            raise HTTPException(status_code=400, detail="File too large (max. 20 MB)")
+            raise HTTPException(status_code=400, detail="File too large (max. 50 MB)")
 
     photo_uuid = str(uuid.uuid4())
     extension = CONTENT_TYPE_EXTENSIONS[request.contentType]

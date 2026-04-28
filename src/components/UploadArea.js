@@ -177,23 +177,14 @@ export default function UploadArea({ category = "guest", uploaderName = "" }) {
   };
 
   async function uploadEntry(entry) {
-    updateEntry(entry.id, { status: "processing", progress: 0, error: null });
+    updateEntry(entry.id, { status: "uploading", progress: 0, error: null });
 
     try {
-      // Extract EXIF date from the original file BEFORE resize strips it.
+      // Extract EXIF date from the original file before upload.
       const takenAt = await extractTakenAt(entry.file);
 
-      let processedFile;
-      try {
-        processedFile = await resizeImage(entry.file);
-      } catch (resizeErr) {
-        // Some browsers cannot decode HEIC/HEIF via createImageBitmap; fallback to original upload.
-        if (entry.file.type === "image/heic" || entry.file.type === "image/heif") {
-          processedFile = entry.file;
-        } else {
-          throw resizeErr;
-        }
-      }
+      // Upload the original file as-is to preserve full resolution and metadata.
+      const processedFile = entry.file;
 
       const controller = new AbortController();
       abortControllersRef.current.set(entry.id, controller);

@@ -8,8 +8,8 @@ const ALLOWED_TYPES = new Set([
   "image/heif",
 ]);
 
-export const MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024; // 15 MB
-export const MAX_UPLOAD_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20 MB
+export const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB
+export const MAX_UPLOAD_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB
 
 /** Returns Authorization header object if a token is present in localStorage. */
 function getAuthHeaders() {
@@ -66,7 +66,7 @@ export function validateFile(file) {
     return `Unsupported file type: ${file.type || "unknown"}. Allowed: JPEG, PNG, WebP, HEIC.`;
   }
   if (file.size > MAX_UPLOAD_FILE_SIZE_BYTES) {
-    return `File too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximum is 20 MB.`;
+    return `File too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximum is 50 MB.`;
   }
   return null;
 }

@@ -21,7 +21,7 @@ router = APIRouter(prefix="/api/photos", tags=["photos"])
 logger = logging.getLogger(__name__)
 
 ALLOWED_CATEGORIES = {"guest", "photographer"}
-MAX_REGISTER_UPLOAD_SIZE_BYTES = 20 * 1024 * 1024
+MAX_REGISTER_UPLOAD_SIZE_BYTES = 50 * 1024 * 1024
 
 
 def get_db():
@@ -97,7 +97,7 @@ def register_photo(
     if content_length <= 0:
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
     if content_length > MAX_REGISTER_UPLOAD_SIZE_BYTES:
-        raise HTTPException(status_code=400, detail="File too large (max. 20 MB).")
+        raise HTTPException(status_code=400, detail="File too large (max. 50 MB).")
 
     raw_content_type = (metadata.get("ContentType") or "").split(";", 1)[0].strip().lower()
     if raw_content_type not in storage.ALLOWED_CONTENT_TYPES:
