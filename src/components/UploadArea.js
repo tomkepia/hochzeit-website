@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { parse as parseExif } from "exifr";
 import { requestUploadUrl, uploadToS3, registerPhoto, validateFile } from "../services/api";
 
-const MAX_CONCURRENT_UPLOADS = 2;
+const MAX_CONCURRENT_UPLOADS = 5;
 const MAX_IMAGE_DIMENSION = 2000;
 const MAX_INPUT_DIMENSION = 8000;
 const JPEG_QUALITY = 0.8;
