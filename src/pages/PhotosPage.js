@@ -298,6 +298,70 @@ export default function PhotosPage() {
     }
   };
 
+  const handleDeleteAll = async () => {
+    if (!isAdmin || isDownloading || isBulkDeleting) return;
+
+    // Collect all photo IDs matching the current category + uploader filter.
+    const allIds = [];
+    let off = 0;
+    let more = true;
+    try {
+      while (more) {
+        // eslint-disable-next-line no-await-in-loop
+        const data = await fetchPhotos(categoryRef.current, 100, off, sortRef.current, uploadedByRef.current);
+        const batch = data.photos || [];
+        for (const p of batch) allIds.push(p.id);
+        off += batch.length;
+        more = data.hasMore;
+      }
+    } catch {
+      showToast("Fehler beim Laden der Foto-IDs");
+      return;
+    }
+
+    if (allIds.length === 0) {
+      showToast("Keine Fotos vorhanden");
+      return;
+    }
+
+    const filterLabel = uploadedByRef.current ? ` von „${uploadedByRef.current}"` : "";
+    const confirmed = window.confirm(
+      `Alle ${allIds.length} Foto(s)${filterLabel} wirklich unwiderruflich löschen?`
+    );
+    if (!confirmed) return;
+
+    try {
+      setIsBulkDeleting(true);
+      setError(null);
+      // Delete in chunks of 200 (API limit).
+      const CHUNK = 200;
+      let totalDeleted = 0;
+      for (let i = 0; i < allIds.length; i += CHUNK) {
+        const chunk = allIds.slice(i, i + CHUNK);
+        // eslint-disable-next-line no-await-in-loop
+        const result = await bulkDeletePhotos(chunk);
+        totalDeleted += result.deletedCount ?? chunk.length;
+      }
+      setPhotos([]);
+      setSelectedPhotoIds(new Set());
+      setSelectionMode(false);
+      offsetRef.current = 0;
+      hasMoreRef.current = false;
+      setHasMore(false);
+      showToast(`${totalDeleted} Foto(s) gelöscht`);
+    } catch (err) {
+      const message = err?.message?.toLowerCase?.() || "";
+      if (message.includes("network") || message.includes("failed to fetch")) {
+        setError("Netzwerkfehler");
+        showToast("Netzwerkfehler");
+      } else {
+        showToast("Löschen fehlgeschlagen");
+      }
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
+
   const togglePhotoSelection = useCallback((photoId) => {
     setSelectedPhotoIds((prev) => {
       const next = new Set(prev);
@@ -1074,6 +1138,30 @@ export default function PhotosPage() {
           >
             Download All
           </button>
+
+          {isAdmin && (
+            <button
+              onClick={handleDeleteAll}
+              disabled={photos.length === 0 || loading || isDownloading || isBulkDeleting}
+              style={{
+                flex: 1,
+                minHeight: 48,
+                borderRadius: 24,
+                border: "1px solid #c0392b",
+                background: "#fdf0ef",
+                color: "#c0392b",
+                cursor:
+                  photos.length === 0 || loading || isDownloading || isBulkDeleting
+                    ? "not-allowed"
+                    : "pointer",
+                opacity: photos.length === 0 || loading || isDownloading || isBulkDeleting ? 0.5 : 1,
+                fontSize: 14,
+                fontWeight: 500,
+              }}
+            >
+              {isBulkDeleting ? "Wird gelöscht…" : "Alle löschen"}
+            </button>
+          )}
         </div>
       </div>
 
