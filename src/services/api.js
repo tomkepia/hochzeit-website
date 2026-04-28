@@ -253,8 +253,32 @@ export async function fetchPhotos(category, limit = 50, offset = 0, sortMode = "
 
 /**
  * Request a ZIP for selected photo IDs and trigger browser download.
+ *
+ * On browsers that support the File System Access API (Chrome, Edge) the save
+ * picker is opened before the fetch so the response stream can be piped
+ * directly to disk — the full ZIP is never buffered in RAM.
+ * On unsupported browsers (Safari, Firefox) the response is buffered as a Blob
+ * and saved via a temporary <a> element (existing behaviour).
  */
 export async function downloadZip(photoIds, filename = "wedding-photos.zip") {
+  // Open the file-save picker immediately while the user-activation token is
+  // still valid. Silently fall through to the blob path if the API is missing
+  // or unavailable in the current context (e.g. cross-origin iframe).
+  let writable = null;
+  if (typeof window.showSaveFilePicker === "function") {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: filename,
+        types: [{ description: "ZIP-Archiv", accept: { "application/zip": [".zip"] } }],
+      });
+      writable = await handle.createWritable();
+    } catch (err) {
+      if (err.name === "AbortError") throw err; // user dismissed picker — propagate
+      // Permission denied, cross-origin restriction, or any other transient
+      // error → fall through to blob path below.
+    }
+  }
+
   const response = await fetch(`${API_BASE}/api/photos/download-zip`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...getAuthHeaders() },
@@ -262,25 +286,32 @@ export async function downloadZip(photoIds, filename = "wedding-photos.zip") {
   });
 
   if (response.status === 401) {
+    if (writable) await writable.abort().catch(() => {});
     handle401();
     throw new Error("Session expired");
   }
 
   if (!response.ok) {
+    if (writable) await writable.abort().catch(() => {});
     const data = await response.json().catch(() => ({}));
     throw new Error(data.detail?.message || data.detail || "Download failed");
   }
 
+  if (writable) {
+    // Stream response body directly to disk — no RAM buffering.
+    await response.body.pipeTo(writable);
+    return;
+  }
+
+  // Fallback: buffer as Blob and trigger <a> download (Safari, Firefox, …).
   const blob = await response.blob();
   const url = window.URL.createObjectURL(blob);
-
   const a = document.createElement("a");
   a.href = url;
   a.download = filename;
   document.body.appendChild(a);
   a.click();
   a.remove();
-
   window.URL.revokeObjectURL(url);
 }
 

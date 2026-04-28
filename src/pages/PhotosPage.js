@@ -6,16 +6,9 @@ import LightboxViewer from "../components/LightboxViewer";
 
 const LIMIT = 50;
 const ZIP_LIMIT = 100;
-const MULTI_DOWNLOAD_DELAY_MS = 500;
 const REFRESH_AFTER_MS = 55 * 60 * 1000;
 const PHOTO_POLL_INTERVAL_MS = 7000;
 const STATS_WARNING_SECONDS = 30;
-
-function delay(ms) {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
-}
 
 const TABS = [
   { key: "guest", label: "Gästefotos" },
@@ -392,6 +385,7 @@ export default function PhotosPage() {
       setSelectionMode(false);
       showToast("Download gestartet");
     } catch (err) {
+      if (err?.name === "AbortError") return; // user dismissed save picker
       const message = err?.message?.toLowerCase?.() || "";
       if (message.includes("network") || message.includes("failed to fetch")) {
         setError("Netzwerkfehler");
@@ -459,36 +453,28 @@ export default function PhotosPage() {
       }
 
       if (chunks.length > 1) {
-        const proceed = window.confirm(
-          `Du lädst viele Fotos herunter (ca. ${downloadableIds.length}).\nDies kann mehrere Downloads auslösen.\n\nFortfahren?`
-        );
-        if (!proceed) {
-          setDownloadStatus(null);
-          return;
-        }
-
-        setDownloadStatus("Mehrere Downloads werden gestartet...");
+        setDownloadStatus(`${chunks.length} ZIPs werden heruntergeladen...`);
       }
 
-      for (let index = 0; index < chunks.length; index += 1) {
-        setDownloadStatus(`Downloading batch ${index + 1} of ${chunks.length}...`);
-        const chunk = chunks[index];
-        const filename =
-          chunks.length === 1
-            ? "hochzeit-fotos.zip"
-            : `hochzeit-fotos-${index + 1}-von-${chunks.length}.zip`;
-        // Required by scope: execute batch downloads sequentially.
-        // eslint-disable-next-line no-await-in-loop
-        await downloadZip(chunk, filename);
+      // Fire all chunk downloads in parallel — no sequential waiting needed.
+      const results = await Promise.allSettled(
+        chunks.map((chunk, index) => {
+          const filename =
+            chunks.length === 1
+              ? "hochzeit-fotos.zip"
+              : `hochzeit-fotos-${index + 1}-von-${chunks.length}.zip`;
+          return downloadZip(chunk, filename);
+        })
+      );
 
-        // Small pause helps browsers reliably open sequential download prompts.
-        if (index < chunks.length - 1) {
-          // eslint-disable-next-line no-await-in-loop
-          await delay(MULTI_DOWNLOAD_DELAY_MS);
-        }
-      }
+      const failures = results.filter(
+        (r) => r.status === "rejected" && r.reason?.name !== "AbortError"
+      );
+      if (failures.length > 0) throw failures[0].reason;
+
       showToast("Download gestartet");
     } catch (err) {
+      if (err?.name === "AbortError") return; // user dismissed save picker
       const message = err?.message?.toLowerCase?.() || "";
       if (message.includes("network") || message.includes("failed to fetch")) {
         setError("Netzwerkfehler");
