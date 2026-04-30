@@ -32,13 +32,13 @@ function InfoSection() {
           <strong>Freitag, 08. Mai:</strong> 
           <p> ab 17 Uhr gemütliches Beisammensein & wir kümmern uns um ein einfaches Abendessen. Wir würden uns freuen, wenn ihr eure Lieblingsgetränke selber mitbringt.</p>
           <strong>Samstag, 09. Mai:</strong> 
-          <p>10 Uhr: Gemeinsames Frühstück</p>
-          <p>14 Uhr: Freie Trauung</p>
-          <p>15 Uhr: Sektempfang</p>
-          <p>gegen 18:30 Uhr: Essen und anschließend Feiern bis spät in die Nacht</p>
+          <p>09:30 Uhr: Gemeinsames Frühstück</p>
+          <p>13:30 Uhr: Freie Trauung</p>
+          <p>14:15 Uhr: Sektempfang</p>
+          <p>gegen 19:00 Uhr: Essen und anschließend Feiern bis spät in die Nacht</p>
           <strong>Sonntag, 10. Mai:</strong>
           <p>ca. 10 Uhr: Gemeinsames Frühstück und gemeinsamer Ausklang</p>
-          <p>Bitte beachtet, am Samstag zwischen dem Frühstück und der freien Trauung ist kein Programm geplant, sodass sich alle auf den Zimmern/im Hotel in Ruhe entspannen und fertig machen können. Damit wir pünktlich um 14 Uhr mit der Trauung beginnen können, bitten wir euch, ab 13:30 Uhr einzutreffen.</p>
+          <p>Bitte beachtet, am Samstag zwischen dem Frühstück und der freien Trauung ist kein Programm geplant, sodass sich alle auf den Zimmern/im Hotel in Ruhe entspannen und fertig machen können. Damit wir pünktlich um 13:30 Uhr mit der Trauung beginnen können, bitten wir euch, ab 13:00 Uhr einzutreffen.</p>
          
         </p>
       </div>
