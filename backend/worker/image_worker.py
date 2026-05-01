@@ -164,10 +164,10 @@ def _extension_from_key(key: str | None) -> str:
     return ext or "jpg"
 
 
-def _iter_photo_chunks(download_url: str, photo_id: str) -> Iterator[bytes]:
+def _iter_photo_chunks(session: requests.Session, download_url: str, photo_id: str) -> Iterator[bytes]:
     """Stream photo bytes from a signed S3 URL in ZIP_CHUNK_SIZE chunks."""
     try:
-        with requests.get(download_url, stream=True, timeout=30) as resp:
+        with session.get(download_url, stream=True, timeout=30) as resp:
             resp.raise_for_status()
             for chunk in resp.iter_content(chunk_size=ZIP_CHUNK_SIZE):
                 if chunk:
@@ -192,21 +192,27 @@ def _process_download_job(db, job: DownloadJob) -> None:
         )
         photo_map = {str(p.id): p for p in photos}
 
-        z = zipstream.ZipStream(compress_type=zipstream.ZIP_DEFLATED)
+        # ZIP_STORED: photos are already compressed (JPEG/HEIC) — deflating wastes
+        # CPU and barely reduces size. Storing is much faster.
+        z = zipstream.ZipStream(compress_type=zipstream.ZIP_STORED)
         added = 0
-        for pid in job.photo_ids:
-            photo = photo_map.get(pid)
-            if not photo or not photo.original_key:
-                logger.warning("Skipping photo %s: not ready or missing key", pid)
-                continue
-            try:
-                url = storage.generate_download_url(photo.original_key)
-            except Exception as exc:
-                logger.error("Signed URL failed for photo %s: %s", pid, exc)
-                continue
-            ext = _extension_from_key(photo.original_key)
-            z.add(_iter_photo_chunks(url, pid), f"wedding-{pid}.{ext}")
-            added += 1
+        session = requests.Session()
+        try:
+            for pid in job.photo_ids:
+                photo = photo_map.get(pid)
+                if not photo or not photo.original_key:
+                    logger.warning("Skipping photo %s: not ready or missing key", pid)
+                    continue
+                try:
+                    url = storage.generate_download_url(photo.original_key)
+                except Exception as exc:
+                    logger.error("Signed URL failed for photo %s: %s", pid, exc)
+                    continue
+                ext = _extension_from_key(photo.original_key)
+                z.add(_iter_photo_chunks(session, url, pid), f"wedding-{pid}.{ext}")
+                added += 1
+        finally:
+            session.close()
 
         if added == 0:
             raise RuntimeError("No downloadable photos available for this job")
