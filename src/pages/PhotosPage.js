@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { downloadZip, fetchPhotos, fetchUploaders, deletePhoto, bulkDeletePhotos, retryPhoto, fetchProcessingStats } from "../services/api";
+import { fetchPhotos, fetchUploaders, deletePhoto, bulkDeletePhotos, retryPhoto, fetchProcessingStats, createDownloadJob, listDownloadJobs, getDownloadJobUrl, triggerDownloadFromUrl } from "../services/api";
 import PhotoGrid from "../components/PhotoGrid";
 import LightboxViewer from "../components/LightboxViewer";
 
 const LIMIT = 50;
-const ZIP_LIMIT = 100;
 const REFRESH_AFTER_MS = 55 * 60 * 1000;
 const PHOTO_POLL_INTERVAL_MS = 7000;
+const JOB_POLL_INTERVAL_MS = 4000; // how often to poll pending download jobs
 const STATS_WARNING_SECONDS = 30;
 
 const TABS = [
@@ -57,6 +57,7 @@ export default function PhotosPage() {
   const [selectedPhotoIds, setSelectedPhotoIds] = useState(() => new Set());
   const [downloadStatus, setDownloadStatus] = useState(null);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadJobs, setDownloadJobs] = useState([]); // async download jobs
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
   const [processingStats, setProcessingStats] = useState(null);
@@ -370,22 +371,17 @@ export default function PhotosPage() {
   const handleDownloadSelected = async () => {
     if (isDownloading) return;
     if (selectedCount === 0) return;
-    if (selectedCount > ZIP_LIMIT) {
-      setError(`Maximal ${ZIP_LIMIT} Fotos pro Download erlaubt.`);
-      showToast("Download fehlgeschlagen");
-      return;
-    }
 
     try {
       setIsDownloading(true);
       setError(null);
-      setDownloadStatus("ZIP wird vorbereitet...");
-      await downloadZip(Array.from(selectedPhotoIds));
+      setDownloadStatus("Download-Auftrag wird erstellt...");
+      const { jobId } = await createDownloadJob(Array.from(selectedPhotoIds));
+      setDownloadJobs((prev) => [{ jobId, status: "queued", photoCount: selectedCount }, ...prev]);
       setSelectedPhotoIds(new Set());
       setSelectionMode(false);
-      showToast("Download gestartet");
+      showToast("Download-Auftrag erstellt – ZIP wird vorbereitet");
     } catch (err) {
-      if (err?.name === "AbortError") return; // user dismissed save picker
       const message = err?.message?.toLowerCase?.() || "";
       if (message.includes("network") || message.includes("failed to fetch")) {
         setError("Netzwerkfehler");
@@ -447,34 +443,12 @@ export default function PhotosPage() {
         return;
       }
 
-      const chunks = [];
-      for (let i = 0; i < downloadableIds.length; i += ZIP_LIMIT) {
-        chunks.push(downloadableIds.slice(i, i + ZIP_LIMIT));
-      }
-
-      if (chunks.length > 1) {
-        setDownloadStatus(`${chunks.length} ZIPs werden heruntergeladen...`);
-      }
-
-      // Fire all chunk downloads in parallel — no sequential waiting needed.
-      const results = await Promise.allSettled(
-        chunks.map((chunk, index) => {
-          const filename =
-            chunks.length === 1
-              ? "hochzeit-fotos.zip"
-              : `hochzeit-fotos-${index + 1}-von-${chunks.length}.zip`;
-          return downloadZip(chunk, filename);
-        })
-      );
-
-      const failures = results.filter(
-        (r) => r.status === "rejected" && r.reason?.name !== "AbortError"
-      );
-      if (failures.length > 0) throw failures[0].reason;
-
-      showToast("Download gestartet");
+      setDownloadStatus("Download-Auftrag wird erstellt...");
+      const { jobId } = await createDownloadJob(downloadableIds);
+      setDownloadJobs((prev) => [{ jobId, status: "queued", photoCount: downloadableIds.length }, ...prev]);
+      showToast(`Download-Auftrag erstellt – ${downloadableIds.length} Fotos werden verpackt`);
     } catch (err) {
-      if (err?.name === "AbortError") return; // user dismissed save picker
+      if (err?.name === "AbortError") return;
       const message = err?.message?.toLowerCase?.() || "";
       if (message.includes("network") || message.includes("failed to fetch")) {
         setError("Netzwerkfehler");
@@ -493,9 +467,42 @@ export default function PhotosPage() {
     sortRef.current = sortMode;
   }, [sortMode]);
 
+  // Load existing download jobs on mount so returning users see their pending/ready jobs.
   useEffect(() => {
-    uploadedByRef.current = uploadedBy;
-  }, [uploadedBy]);
+    listDownloadJobs()
+      .then((jobs) => setDownloadJobs(jobs))
+      .catch(() => {}); // silent — not critical
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Poll for download-job status updates while there are queued/processing jobs.
+  useEffect(() => {
+    const hasPending = downloadJobs.some(
+      (j) => j.status === "queued" || j.status === "processing"
+    );
+    if (!hasPending) return;
+
+    const interval = setInterval(() => {
+      listDownloadJobs()
+        .then((jobs) => setDownloadJobs(jobs))
+        .catch(() => {});
+    }, JOB_POLL_INTERVAL_MS);
+
+    return () => clearInterval(interval);
+  }, [downloadJobs]);
+
+  const handleDownloadJobFile = useCallback(async (jobId, photoCount) => {
+    try {
+      const { url } = await getDownloadJobUrl(jobId);
+      triggerDownloadFromUrl(url, `hochzeit-fotos-${photoCount}-bilder.zip`);
+    } catch {
+      showToast("Download-Link konnte nicht abgerufen werden");
+    }
+  }, [showToast]);
+
+  const dismissDownloadJob = useCallback((jobId) => {
+    setDownloadJobs((prev) => prev.filter((j) => j.jobId !== jobId));
+  }, []);
 
   // Reload available uploader names whenever the category changes.
   useEffect(() => {
@@ -928,7 +935,7 @@ export default function PhotosPage() {
             <div style={{ display: "flex", gap: 8 }}>
               <button
                 onClick={handleDownloadSelected}
-                disabled={selectedCount === 0 || selectedCount > ZIP_LIMIT || isDownloading || isBulkDeleting}
+                disabled={selectedCount === 0 || isDownloading || isBulkDeleting}
                 style={{
                   border: "1px solid #8b7355",
                   background: "#8b7355",
@@ -937,11 +944,11 @@ export default function PhotosPage() {
                   minHeight: 48,
                   borderRadius: 999,
                   cursor:
-                    selectedCount === 0 || selectedCount > ZIP_LIMIT || isDownloading || isBulkDeleting
+                    selectedCount === 0 || isDownloading || isBulkDeleting
                       ? "not-allowed"
                       : "pointer",
                   opacity:
-                    selectedCount === 0 || selectedCount > ZIP_LIMIT || isDownloading || isBulkDeleting
+                    selectedCount === 0 || isDownloading || isBulkDeleting
                       ? 0.55
                       : 1,
                   fontSize: 14,
@@ -995,6 +1002,84 @@ export default function PhotosPage() {
           <p style={{ textAlign: "center", color: "#6b5c4e", fontSize: 14, marginBottom: 16 }}>
             {downloadStatus}
           </p>
+        )}
+
+        {/* Download jobs panel */}
+        {downloadJobs.length > 0 && (
+          <div style={{ marginBottom: 20 }}>
+            {downloadJobs.map((job) => {
+              const isPending = job.status === "queued" || job.status === "processing";
+              const isReady = job.status === "ready";
+              const isFailed = job.status === "failed";
+
+              return (
+                <div
+                  key={job.jobId}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: "10px 14px",
+                    marginBottom: 8,
+                    borderRadius: 10,
+                    border: isReady
+                      ? "1px solid #b8d4a8"
+                      : isFailed
+                        ? "1px solid #e0afa8"
+                        : "1px solid #e2d6c8",
+                    background: isReady ? "#f2f9ee" : isFailed ? "#fdf3f2" : "#faf7f4",
+                    fontSize: 13,
+                    color: "#5c4a3c",
+                  }}
+                >
+                  {isPending && (
+                    <span style={{ animation: "spin 1s linear infinite", display: "inline-block", fontSize: 16 }}>⏳</span>
+                  )}
+                  {isReady && <span style={{ fontSize: 16 }}>✅</span>}
+                  {isFailed && <span style={{ fontSize: 16 }}>❌</span>}
+
+                  <span style={{ flex: 1 }}>
+                    {isPending && `ZIP wird erstellt… (${job.photoCount} Fotos)`}
+                    {isReady && `ZIP bereit (${job.photoCount} Fotos)`}
+                    {isFailed && `ZIP-Erstellung fehlgeschlagen`}
+                  </span>
+
+                  {isReady && (
+                    <button
+                      onClick={() => handleDownloadJobFile(job.jobId, job.photoCount)}
+                      style={{
+                        background: "#8b7355",
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: 999,
+                        padding: "6px 14px",
+                        fontSize: 13,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Herunterladen
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => dismissDownloadJob(job.jobId)}
+                    title="Schließen"
+                    style={{
+                      background: "transparent",
+                      border: "none",
+                      color: "#9b8a7a",
+                      cursor: "pointer",
+                      fontSize: 16,
+                      lineHeight: 1,
+                      padding: "2px 4px",
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              );
+            })}
+          </div>
         )}
 
         {toastMessage && (

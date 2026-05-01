@@ -98,14 +98,19 @@ def generate_download_url(key: str) -> str:
 
     Expires after DOWNLOAD_URL_EXPIRY seconds.
     """
+    return generate_download_url_with_expiry(key, DOWNLOAD_URL_EXPIRY)
+
+
+def generate_download_url_with_expiry(key: str, expires_in: int) -> str:
+    """Generate a pre-signed GET URL with a custom expiry (seconds)."""
     client = _get_s3_client()
     bucket = _get_bucket()
     url = client.generate_presigned_url(
         "get_object",
         Params={"Bucket": bucket, "Key": key},
-        ExpiresIn=DOWNLOAD_URL_EXPIRY,
+        ExpiresIn=expires_in,
     )
-    logger.info("Generated download URL for key=%s", key)
+    logger.info("Generated download URL for key=%s (expires_in=%ds)", key, expires_in)
     return url
 
 
@@ -149,3 +154,69 @@ def check_connection() -> dict:
         return {"status": "error", "error": f"S3 ClientError {code}: {exc}"}
     except Exception as exc:
         return {"status": "error", "error": str(exc)}
+
+
+# Minimum part size for S3 multipart upload (5 MB), except for the last part.
+_MULTIPART_MIN_PART_BYTES = 5 * 1024 * 1024
+
+
+def upload_stream_as_zip(key: str, data_iter) -> None:
+    """Stream an iterable of bytes chunks to S3 using multipart upload.
+
+    This allows piping a zipstream generator directly to S3 without buffering
+    the entire archive in memory.  Parts are accumulated locally until they
+    reach the 5 MB minimum required by S3, then flushed as a part.
+
+    Args:
+        key:       Destination S3 key (e.g. "zips/{job_id}.zip").
+        data_iter: An iterable yielding bytes chunks (e.g. a zipstream.ZipStream).
+    """
+    client = _get_s3_client()
+    bucket = _get_bucket()
+
+    mpu = client.create_multipart_upload(Bucket=bucket, Key=key, ContentType="application/zip")
+    upload_id = mpu["UploadId"]
+    parts = []
+    part_number = 1
+    buffer = b""
+
+    try:
+        for chunk in data_iter:
+            if not chunk:
+                continue
+            buffer += chunk
+            if len(buffer) >= _MULTIPART_MIN_PART_BYTES:
+                response = client.upload_part(
+                    Bucket=bucket,
+                    Key=key,
+                    UploadId=upload_id,
+                    PartNumber=part_number,
+                    Body=buffer,
+                )
+                parts.append({"PartNumber": part_number, "ETag": response["ETag"]})
+                part_number += 1
+                buffer = b""
+
+        # Upload any remaining bytes as the final (possibly smaller) part.
+        if buffer:
+            response = client.upload_part(
+                Bucket=bucket,
+                Key=key,
+                UploadId=upload_id,
+                PartNumber=part_number,
+                Body=buffer,
+            )
+            parts.append({"PartNumber": part_number, "ETag": response["ETag"]})
+
+        client.complete_multipart_upload(
+            Bucket=bucket,
+            Key=key,
+            UploadId=upload_id,
+            MultipartUpload={"Parts": parts},
+        )
+        logger.info("Multipart upload complete for s3://%s/%s (%d part(s))", bucket, key, len(parts))
+
+    except Exception:
+        client.abort_multipart_upload(Bucket=bucket, Key=key, UploadId=upload_id)
+        logger.exception("Multipart upload aborted for s3://%s/%s", bucket, key)
+        raise

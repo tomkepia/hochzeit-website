@@ -399,3 +399,101 @@ export async function retryPhoto(photoId) {
   if (!res.ok) throw new Error("Retry failed");
   return res.json();
 }
+
+// ---------------------------------------------------------------------------
+// Async download-job API
+// ---------------------------------------------------------------------------
+
+/**
+ * Create an async ZIP download job on the backend.
+ * Returns { jobId: string }.
+ */
+export async function createDownloadJob(photoIds) {
+  const res = await fetch(`${API_BASE}/api/download-jobs`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+    body: JSON.stringify({ photoIds }),
+  });
+
+  if (res.status === 401) {
+    handle401();
+    throw new Error("Session expired");
+  }
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail?.message || data.detail || `Failed to create download job (${res.status})`);
+  }
+
+  return res.json(); // { jobId }
+}
+
+/**
+ * List all download jobs for the current user.
+ * Returns an array of job objects.
+ */
+export async function listDownloadJobs() {
+  const res = await fetch(`${API_BASE}/api/download-jobs`, {
+    headers: { ...getAuthHeaders() },
+  });
+
+  if (res.status === 401) {
+    handle401();
+    throw new Error("Session expired");
+  }
+
+  if (!res.ok) throw new Error(`Failed to list download jobs (${res.status})`);
+  return res.json(); // array of job objects
+}
+
+/**
+ * Get the status of a single download job.
+ */
+export async function getDownloadJob(jobId) {
+  const res = await fetch(`${API_BASE}/api/download-jobs/${encodeURIComponent(jobId)}`, {
+    headers: { ...getAuthHeaders() },
+  });
+
+  if (res.status === 401) {
+    handle401();
+    throw new Error("Session expired");
+  }
+
+  if (!res.ok) throw new Error(`Failed to get download job (${res.status})`);
+  return res.json();
+}
+
+/**
+ * Get a fresh signed download URL for a ready download job.
+ * Returns { url: string }.
+ */
+export async function getDownloadJobUrl(jobId) {
+  const res = await fetch(`${API_BASE}/api/download-jobs/${encodeURIComponent(jobId)}/url`, {
+    headers: { ...getAuthHeaders() },
+  });
+
+  if (res.status === 401) {
+    handle401();
+    throw new Error("Session expired");
+  }
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || `Failed to get download URL (${res.status})`);
+  }
+
+  return res.json(); // { url }
+}
+
+/**
+ * Trigger a browser download from a signed S3 URL by navigating to it.
+ * The browser's native download manager handles the rest.
+ */
+export function triggerDownloadFromUrl(url, filename) {
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename || "hochzeit-fotos.zip";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}

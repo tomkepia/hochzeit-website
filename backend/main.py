@@ -10,6 +10,7 @@ from routers.storage import router as storage_router
 from routers.photos import router as photos_router
 from routers.auth import router as auth_router
 from routers.admin import router as admin_router
+from routers.download_jobs import router as download_jobs_router
 from openpyxl import Workbook
 from io import BytesIO
 
@@ -36,6 +37,7 @@ app.include_router(auth_router)
 app.include_router(storage_router)
 app.include_router(photos_router)
 app.include_router(admin_router, prefix="/api/admin")
+app.include_router(download_jobs_router)
 
 # Initialize the database on startup
 @app.on_event("startup")

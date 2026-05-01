@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import Column, Integer, String, Boolean, Text, DateTime
+from sqlalchemy import Column, Integer, String, Boolean, Text, DateTime, JSON
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
@@ -60,3 +60,22 @@ class AccessToken(Base):
     token = Column(Text, unique=True, nullable=False)
     expires_at = Column(DateTime, nullable=False)
     permissions = Column(String)  # e.g. "upload:view"
+
+
+class DownloadJob(Base):
+    __tablename__ = "download_jobs"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    # Owner: hashed gallery token so jobs are scoped per-user without exposing the raw token.
+    owner_key = Column(Text, nullable=False, index=True)
+    # 'queued' | 'processing' | 'ready' | 'failed'
+    status = Column(String, nullable=False, default="queued")
+    # IDs of photos to include, stored as a JSON array.
+    photo_ids = Column(JSON, nullable=False)
+    # S3 key of the produced ZIP, set when status becomes 'ready'.
+    zip_key = Column(Text, nullable=True)
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+    # When the job (and its ZIP) should be deleted.
+    expires_at = Column(DateTime, nullable=False)
