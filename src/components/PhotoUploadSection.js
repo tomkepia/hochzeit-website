@@ -1,7 +1,7 @@
 
 import React from "react";
+import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Coffee } from "lucide-react";
 
 function PhotoUploadSection() {
   return (
@@ -25,8 +25,11 @@ function PhotoUploadSection() {
         </fieldset>
       </form> */}
       <p style={{ color: '#6b5a45', marginTop: '2rem' }}>
-        Hier könnt ihr später eure Fotos von der Hochzeit hochladen!
+        Schaut euch alle Fotos von der Hochzeit an oder ladet eure eigenen hoch!
       </p>
+      <Link to="/gallery" className="submit-btn" style={{ display: 'inline-block', marginTop: '1.5rem', textDecoration: 'none' }}>
+        Zur Foto Gallery
+      </Link>
     </section>
   );
 }
