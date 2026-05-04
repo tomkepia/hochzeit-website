@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { tokenLogin } from "../services/api";
 
@@ -39,6 +40,8 @@ export default function GalleryEntryPage() {
         {tokenError && (
           <p style={styles.errorMessage}>{tokenError}</p>
         )}
+
+        <Link to="/" style={styles.homeLink}>← Zurück zur Startseite</Link>
 
         <button
           type="button"
@@ -120,5 +123,13 @@ const styles = {
     fontFamily: "'Montserrat', sans-serif",
     fontSize: 14,
     color: "#c0392b",
+  },
+  homeLink: {
+    display: "inline-block",
+    marginBottom: 20,
+    fontFamily: "'Montserrat', sans-serif",
+    fontSize: 14,
+    color: "#7c6957",
+    textDecoration: "none",
   },
 };
