@@ -36,6 +36,9 @@ class Photo(Base):
     # NULL = job is ready to run immediately.
     # Migration for existing databases: ALTER TABLE photos ADD COLUMN next_attempt_at TIMESTAMP NULL;
     next_attempt_at = Column(DateTime, nullable=True)
+    # Timestamp when processing last completed successfully.
+    # Migration for existing databases: ALTER TABLE photos ADD COLUMN processed_at TIMESTAMP NULL;
+    processed_at = Column(DateTime, nullable=True)
 
 
 class Guest(Base):
@@ -68,6 +71,14 @@ class DownloadJob(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     # Owner: hashed gallery token so jobs are scoped per-user without exposing the raw token.
     owner_key = Column(Text, nullable=False, index=True)
+    # 'user' | 'archive_fixed' | 'archive_tail'
+    job_kind = Column(String, nullable=False, default="user")
+    # 'guest' | 'photographer' for archive jobs; nullable for user jobs.
+    category = Column(String, nullable=True)
+    # 1-based fixed archive segment index; NULL for user jobs and rolling tail jobs.
+    segment_index = Column(Integer, nullable=True)
+    # Suggested filename presented to the browser.
+    file_name = Column(Text, nullable=True)
     # 'queued' | 'processing' | 'ready' | 'failed'
     status = Column(String, nullable=False, default="queued")
     # IDs of photos to include, stored as a JSON array.

@@ -81,6 +81,10 @@ BACKOFF_MAX_SECONDS = 300   # cap at 5 minutes
 INTER_BATCH_SLEEP = 1       # seconds
 
 ZIP_CHUNK_SIZE = 64 * 1024  # 64 KB read chunks when streaming photo bytes into ZIP
+ARCHIVE_SEGMENT_SIZE = 100
+TAIL_BUILD_COOLDOWN_MINUTES = 10
+SYSTEM_OWNER_KEY = "system"
+ARCHIVE_CATEGORIES = ("guest", "photographer")
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -148,6 +152,183 @@ def _backoff_seconds(attempts: int) -> int:
     return min(BACKOFF_BASE_SECONDS * attempts, BACKOFF_MAX_SECONDS)
 
 
+def _archive_label(category: str) -> str:
+    return "gaestefotos" if category == "guest" else "fotografenfotos"
+
+
+def _ordered_done_photos(db, category: str) -> list[Photo]:
+    return (
+        db.query(Photo)
+        .filter(Photo.category == category, Photo.processing_status == "done")
+        .order_by(Photo.created_at.asc(), Photo.id.asc())
+        .all()
+    )
+
+
+def _photo_queue_is_idle(db) -> bool:
+    active_count = (
+        db.query(Photo)
+        .filter(Photo.processing_status.in_(["pending", "processing"]))
+        .count()
+    )
+    return active_count == 0
+
+
+def _job_file_name(job_kind: str, category: str | None, segment_index: int | None, photo_count: int) -> str:
+    if job_kind == "archive_fixed" and category and segment_index is not None:
+        return f"hochzeit-{_archive_label(category)}-teil-{segment_index:03d}.zip"
+    if job_kind == "archive_tail" and category:
+        return f"hochzeit-{_archive_label(category)}-neueste-fotos.zip"
+    if category:
+        return f"hochzeit-{_archive_label(category)}-{photo_count}-fotos.zip"
+    return f"hochzeit-fotos-{photo_count}.zip"
+
+
+def _job_zip_key(job: DownloadJob) -> str:
+    if job.job_kind == "archive_fixed" and job.category and job.segment_index is not None:
+        return f"zips/archives/{job.category}/segment-{job.segment_index:03d}.zip"
+    if job.job_kind == "archive_tail" and job.category:
+        return f"zips/archives/{job.category}/tail-current.zip"
+    return f"zips/{job.id}.zip"
+
+
+def _delete_job_zip(job: DownloadJob) -> None:
+    if not job.zip_key:
+        return
+    try:
+        storage.delete_file(job.zip_key)
+        logger.info("Deleted ZIP artifact %s", job.zip_key)
+    except Exception as exc:
+        logger.warning("Could not delete ZIP %s: %s", job.zip_key, exc)
+
+
+def _queue_archive_job(db, *, category: str, job_kind: str, photo_ids: list[str], segment_index: int | None = None) -> None:
+    job = DownloadJob(
+        owner_key=SYSTEM_OWNER_KEY,
+        job_kind=job_kind,
+        category=category,
+        segment_index=segment_index,
+        file_name=_job_file_name(job_kind, category, segment_index, len(photo_ids)),
+        status="queued",
+        photo_ids=photo_ids,
+        expires_at=datetime.utcnow() + timedelta(days=365),
+    )
+    db.add(job)
+    db.commit()
+    logger.info(
+        "Queued archive job kind=%s category=%s segment=%s (%d photos)",
+        job_kind,
+        category,
+        segment_index,
+        len(photo_ids),
+    )
+
+
+def _ensure_fixed_archives_for_category(db, category: str) -> None:
+    photos = _ordered_done_photos(db, category)
+    ordered_ids = [str(photo.id) for photo in photos]
+    fixed_segment_count = len(ordered_ids) // ARCHIVE_SEGMENT_SIZE
+
+    for segment_index in range(1, fixed_segment_count + 1):
+        expected_ids = ordered_ids[
+            (segment_index - 1) * ARCHIVE_SEGMENT_SIZE: segment_index * ARCHIVE_SEGMENT_SIZE
+        ]
+        rows = (
+            db.query(DownloadJob)
+            .filter(
+                DownloadJob.owner_key == SYSTEM_OWNER_KEY,
+                DownloadJob.job_kind == "archive_fixed",
+                DownloadJob.category == category,
+                DownloadJob.segment_index == segment_index,
+            )
+            .order_by(DownloadJob.updated_at.desc(), DownloadJob.created_at.desc())
+            .all()
+        )
+
+        if any(row.status == "ready" and row.photo_ids == expected_ids for row in rows):
+            continue
+        if any(row.status in {"queued", "processing"} and row.photo_ids == expected_ids for row in rows):
+            continue
+        if any(row.status in {"queued", "processing"} for row in rows):
+            continue
+
+        for row in rows:
+            _delete_job_zip(row)
+            db.delete(row)
+        if rows:
+            db.commit()
+
+        _queue_archive_job(
+            db,
+            category=category,
+            job_kind="archive_fixed",
+            photo_ids=expected_ids,
+            segment_index=segment_index,
+        )
+
+
+def _ensure_tail_archive_for_category(db, category: str) -> None:
+    photos = _ordered_done_photos(db, category)
+    ordered_ids = [str(photo.id) for photo in photos]
+    fixed_cover_count = (len(ordered_ids) // ARCHIVE_SEGMENT_SIZE) * ARCHIVE_SEGMENT_SIZE
+    tail_ids = ordered_ids[fixed_cover_count:]
+    rows = (
+        db.query(DownloadJob)
+        .filter(
+            DownloadJob.owner_key == SYSTEM_OWNER_KEY,
+            DownloadJob.job_kind == "archive_tail",
+            DownloadJob.category == category,
+        )
+        .order_by(DownloadJob.updated_at.desc(), DownloadJob.created_at.desc())
+        .all()
+    )
+
+    if not tail_ids:
+        return
+    if any(row.status == "ready" and row.photo_ids == tail_ids for row in rows):
+        return
+    if any(row.status in {"queued", "processing"} and row.photo_ids == tail_ids for row in rows):
+        return
+    if any(row.status in {"queued", "processing"} for row in rows):
+        return
+
+    last_photo = photos[-1]
+    last_photo_at = last_photo.processed_at or last_photo.created_at or datetime.utcnow()
+    if datetime.utcnow() - last_photo_at < timedelta(minutes=TAIL_BUILD_COOLDOWN_MINUTES):
+        return
+
+    _queue_archive_job(
+        db,
+        category=category,
+        job_kind="archive_tail",
+        photo_ids=tail_ids,
+    )
+
+
+def _ensure_archive_jobs(db) -> None:
+    for category in ARCHIVE_CATEGORIES:
+        _ensure_fixed_archives_for_category(db, category)
+        _ensure_tail_archive_for_category(db, category)
+
+
+def _next_queued_download_job(db) -> DownloadJob | None:
+    jobs = (
+        db.query(DownloadJob)
+        .filter(DownloadJob.status == "queued")
+        .with_for_update(skip_locked=True)
+        .all()
+    )
+    if not jobs:
+        return None
+    return min(
+        jobs,
+        key=lambda job: (
+            0 if job.job_kind == "user" else 1,
+            job.created_at or datetime.utcnow(),
+        ),
+    )
+
+
 # ---------------------------------------------------------------------------
 # Download-ZIP job helpers
 # ---------------------------------------------------------------------------
@@ -181,7 +362,14 @@ def _process_download_job(db, job: DownloadJob) -> None:
     job_id = str(job.id)
     job.status = "processing"
     db.commit()
-    logger.info("Processing download job %s (%d photos)", job_id, len(job.photo_ids))
+    logger.info(
+        "Processing download job %s kind=%s category=%s segment=%s (%d photos)",
+        job_id,
+        job.job_kind,
+        job.category,
+        job.segment_index,
+        len(job.photo_ids),
+    )
 
     try:
         photo_uuids = [uuid_lib.UUID(pid) for pid in job.photo_ids]
@@ -217,11 +405,13 @@ def _process_download_job(db, job: DownloadJob) -> None:
         if added == 0:
             raise RuntimeError("No downloadable photos available for this job")
 
-        zip_key = f"zips/{job_id}.zip"
+        zip_key = _job_zip_key(job)
         storage.upload_stream_as_zip(zip_key, z)
 
         job.status = "ready"
         job.zip_key = zip_key
+        if not job.file_name:
+            job.file_name = _job_file_name(job.job_kind, job.category, job.segment_index, added)
         job.error_message = None
         db.commit()
         logger.info("Download job %s complete → s3 key=%s", job_id, zip_key)
@@ -238,16 +428,11 @@ def _cleanup_expired_download_jobs(db) -> None:
     now = datetime.utcnow()
     expired = (
         db.query(DownloadJob)
-        .filter(DownloadJob.expires_at < now)
+        .filter(DownloadJob.owner_key != SYSTEM_OWNER_KEY, DownloadJob.expires_at < now)
         .all()
     )
     for job in expired:
-        if job.zip_key:
-            try:
-                storage.delete_file(job.zip_key)
-                logger.info("Deleted expired ZIP %s", job.zip_key)
-            except Exception as exc:
-                logger.warning("Could not delete ZIP %s: %s", job.zip_key, exc)
+        _delete_job_zip(job)
         db.delete(job)
     if expired:
         db.commit()
@@ -285,6 +470,7 @@ def _handle_photo(db, photo: Photo) -> None:
         photo.processing_status = "done"
         photo.processing_error = None
         photo.next_attempt_at = None
+        photo.processed_at = datetime.utcnow()
         db.commit()
 
         logger.info("Processing success %s", photo_id)
@@ -297,6 +483,7 @@ def _handle_photo(db, photo: Photo) -> None:
             if photo.processing_attempts >= MAX_ATTEMPTS:
                 photo.processing_status = "failed"
                 photo.next_attempt_at = None
+                photo.processed_at = None
                 logger.error(
                     "Processing failed permanently %s after %d attempt(s): %s",
                     photo_id,
@@ -307,6 +494,7 @@ def _handle_photo(db, photo: Photo) -> None:
                 delay = _backoff_seconds(photo.processing_attempts)
                 photo.processing_status = "pending"
                 photo.next_attempt_at = datetime.utcnow() + timedelta(seconds=delay)
+                photo.processed_at = None
                 logger.warning(
                     "Retry scheduled for %s in %ds (attempt %d failed): %s",
                     photo_id,
@@ -361,14 +549,11 @@ def run_worker() -> None:
             if not photos:
                 db.rollback()  # release FOR UPDATE lock immediately
 
+                if _photo_queue_is_idle(db):
+                    _ensure_archive_jobs(db)
+
                 # No photo-processing work — check for a queued download job.
-                dl_job = (
-                    db.query(DownloadJob)
-                    .filter(DownloadJob.status == "queued")
-                    .order_by(DownloadJob.created_at.asc())
-                    .with_for_update(skip_locked=True)
-                    .first()
-                )
+                dl_job = _next_queued_download_job(db)
                 if dl_job:
                     _process_download_job(db, dl_job)
                 else:
@@ -381,14 +566,11 @@ def run_worker() -> None:
             for photo in photos:
                 _handle_photo(db, photo)
 
+            if _photo_queue_is_idle(db):
+                _ensure_archive_jobs(db)
+
             # After processing a photo batch, also try one queued download job.
-            dl_job = (
-                db.query(DownloadJob)
-                .filter(DownloadJob.status == "queued")
-                .order_by(DownloadJob.created_at.asc())
-                .with_for_update(skip_locked=True)
-                .first()
-            )
+            dl_job = _next_queued_download_job(db)
             if dl_job:
                 _process_download_job(db, dl_job)
 

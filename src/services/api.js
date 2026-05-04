@@ -408,11 +408,11 @@ export async function retryPhoto(photoId) {
  * Create an async ZIP download job on the backend.
  * Returns { jobId: string }.
  */
-export async function createDownloadJob(photoIds) {
+export async function createDownloadJob(photoIds, category = null) {
   const res = await fetch(`${API_BASE}/api/download-jobs`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...getAuthHeaders() },
-    body: JSON.stringify({ photoIds }),
+    body: JSON.stringify({ photoIds, category }),
   });
 
   if (res.status === 401) {
@@ -483,6 +483,30 @@ export async function getDownloadJobUrl(jobId) {
   }
 
   return res.json(); // { url }
+}
+
+/**
+ * Build a "download all" plan for a category.
+ * Returns ready archive parts plus an optional pending tail job.
+ */
+export async function createDownloadAllPlan(category) {
+  const res = await fetch(`${API_BASE}/api/download-jobs/download-all-plan`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+    body: JSON.stringify({ category }),
+  });
+
+  if (res.status === 401) {
+    handle401();
+    throw new Error("Session expired");
+  }
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || `Failed to build download plan (${res.status})`);
+  }
+
+  return res.json();
 }
 
 /**

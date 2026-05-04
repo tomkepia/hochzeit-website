@@ -76,6 +76,7 @@ def retry_photo(photo_id: str, db: Session = Depends(get_db)):
     photo.processing_attempts = 0
     photo.processing_error = None
     photo.next_attempt_at = None
+    photo.processed_at = None
     db.commit()
 
     logger.info(

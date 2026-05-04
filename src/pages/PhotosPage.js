@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { fetchPhotos, fetchUploaders, deletePhoto, bulkDeletePhotos, retryPhoto, fetchProcessingStats, createDownloadJob, listDownloadJobs, getDownloadJobUrl, triggerDownloadFromUrl } from "../services/api";
+import { fetchPhotos, fetchUploaders, deletePhoto, bulkDeletePhotos, retryPhoto, fetchProcessingStats, createDownloadJob, listDownloadJobs, getDownloadJobUrl, createDownloadAllPlan, triggerDownloadFromUrl } from "../services/api";
 import PhotoGrid from "../components/PhotoGrid";
 import LightboxViewer from "../components/LightboxViewer";
 
@@ -86,6 +86,16 @@ export default function PhotosPage() {
       setToastMessage(null);
       toastTimeoutRef.current = null;
     }, 2800);
+  }, []);
+
+  const startArchiveDownloads = useCallback((archives) => {
+    archives.forEach((archive, index) => {
+      window.setTimeout(() => {
+        if (archive?.downloadUrl) {
+          triggerDownloadFromUrl(archive.downloadUrl, archive.fileName);
+        }
+      }, index * 250);
+    });
   }, []);
 
   const loadStats = useCallback(async () => {
@@ -376,7 +386,7 @@ export default function PhotosPage() {
       setIsDownloading(true);
       setError(null);
       setDownloadStatus("Download-Auftrag wird erstellt...");
-      const { jobId } = await createDownloadJob(Array.from(selectedPhotoIds));
+      const { jobId } = await createDownloadJob(Array.from(selectedPhotoIds), categoryRef.current);
       setDownloadJobs((prev) => [{ jobId, status: "queued", photoCount: selectedCount }, ...prev]);
       setSelectedPhotoIds(new Set());
       setSelectionMode(false);
@@ -402,7 +412,45 @@ export default function PhotosPage() {
     try {
       setIsDownloading(true);
       setError(null);
-      setDownloadStatus("Fotos werden gesammelt...");
+      setDownloadStatus("Download-Paket wird vorbereitet...");
+
+      // Archive planning only supports full category downloads. Filtered downloads
+      // still fall back to a dedicated user job because fixed archives are built
+      // for the category as a whole.
+      if (!uploadedByRef.current) {
+        const plan = await createDownloadAllPlan(categoryRef.current);
+        const readyArchives = plan.archives || [];
+        const pendingJob = plan.pendingJob;
+
+        if (readyArchives.length > 0) {
+          startArchiveDownloads(readyArchives);
+        }
+
+        if (pendingJob) {
+          setDownloadJobs((prev) => [
+            pendingJob,
+            ...prev.filter((job) => job.jobId !== pendingJob.jobId),
+          ]);
+        }
+
+        if (readyArchives.length > 0 && pendingJob) {
+          showToast(`${readyArchives.length} ZIP(s) starten jetzt, der Rest wird vorbereitet`);
+          return;
+        }
+
+        if (readyArchives.length > 0) {
+          showToast(`${readyArchives.length} ZIP(s) werden heruntergeladen`);
+          return;
+        }
+
+        if (pendingJob) {
+          showToast("Aktuelle Fotos werden als neues ZIP vorbereitet");
+          return;
+        }
+
+        showToast("Keine Fotos gefunden");
+        return;
+      }
 
       const allPhotoMap = new Map(photos.map((photo) => [photo.id, photo]));
       const allPhotoIds = [...allPhotoMap.keys()];
@@ -426,25 +474,17 @@ export default function PhotosPage() {
         more = data.hasMore;
       }
 
-      setPhotos(Array.from(allPhotoMap.values()));
-      offsetRef.current = allPhotoIds.length;
-      hasMoreRef.current = false;
-      setHasMore(false);
-
-      // Only include fully processed photos in the ZIP.
       const downloadableIds = allPhotoIds.filter((id) => {
-        const p = allPhotoMap.get(id);
-        return !p?.processingStatus || p.processingStatus === "done";
+        const photo = allPhotoMap.get(id);
+        return !photo?.processingStatus || photo.processingStatus === "done";
       });
 
       if (downloadableIds.length === 0) {
-        setDownloadStatus(null);
         showToast("Keine Fotos gefunden");
         return;
       }
 
-      setDownloadStatus("Download-Auftrag wird erstellt...");
-      const { jobId } = await createDownloadJob(downloadableIds);
+      const { jobId } = await createDownloadJob(downloadableIds, categoryRef.current);
       setDownloadJobs((prev) => [{ jobId, status: "queued", photoCount: downloadableIds.length }, ...prev]);
       showToast(`Download-Auftrag erstellt – ${downloadableIds.length} Fotos werden verpackt`);
     } catch (err) {
@@ -491,10 +531,10 @@ export default function PhotosPage() {
     return () => clearInterval(interval);
   }, [downloadJobs]);
 
-  const handleDownloadJobFile = useCallback(async (jobId, photoCount) => {
+  const handleDownloadJobFile = useCallback(async (jobId, fileName, photoCount) => {
     try {
       const { url } = await getDownloadJobUrl(jobId);
-      triggerDownloadFromUrl(url, `hochzeit-fotos-${photoCount}-bilder.zip`);
+      triggerDownloadFromUrl(url, fileName || `hochzeit-fotos-${photoCount}-bilder.zip`);
     } catch {
       showToast("Download-Link konnte nicht abgerufen werden");
     }
@@ -1046,7 +1086,7 @@ export default function PhotosPage() {
 
                   {isReady && (
                     <button
-                      onClick={() => handleDownloadJobFile(job.jobId, job.photoCount)}
+                      onClick={() => handleDownloadJobFile(job.jobId, job.fileName, job.photoCount)}
                       style={{
                         background: "#8b7355",
                         color: "#fff",
