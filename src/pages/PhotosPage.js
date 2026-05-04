@@ -427,6 +427,7 @@ export default function PhotosPage() {
           status: "ready",
           photoCount: a.photoCount,
           fileName: a.fileName,
+          downloadUrl: a.downloadUrl,
         }));
 
         const allNewJobs = pendingJob
@@ -538,9 +539,10 @@ export default function PhotosPage() {
     return () => clearInterval(interval);
   }, [downloadJobs]);
 
-  const handleDownloadJobFile = useCallback(async (jobId, fileName, photoCount) => {
+  const handleDownloadJobFile = useCallback(async (jobId, fileName, photoCount, downloadUrl) => {
     try {
-      const { url } = await getDownloadJobUrl(jobId);
+      // Archive jobs include a pre-signed URL directly; user jobs need a fresh URL from the server.
+      const url = downloadUrl || (await getDownloadJobUrl(jobId)).url;
       triggerDownloadFromUrl(url, fileName || `hochzeit-fotos-${photoCount}-bilder.zip`);
     } catch {
       showToast("Download-Link konnte nicht abgerufen werden");
@@ -1093,7 +1095,7 @@ export default function PhotosPage() {
 
                   {isReady && (
                     <button
-                      onClick={() => handleDownloadJobFile(job.jobId, job.fileName, job.photoCount)}
+                      onClick={() => handleDownloadJobFile(job.jobId, job.fileName, job.photoCount, job.downloadUrl)}
                       style={{
                         background: "#8b7355",
                         color: "#fff",
