@@ -41,8 +41,6 @@ export default function GalleryEntryPage() {
           <p style={styles.errorMessage}>{tokenError}</p>
         )}
 
-        <Link to="/" style={styles.homeLink}>← Zurück zur Startseite</Link>
-
         <button
           type="button"
           style={{ ...styles.button, ...styles.uploadButton }}
@@ -58,6 +56,8 @@ export default function GalleryEntryPage() {
         >
           🖼 Fotos ansehen
         </button>
+
+        <Link to="/" style={styles.homeLink}>← Zurück zur Startseite</Link>
       </div>
     </div>
   );

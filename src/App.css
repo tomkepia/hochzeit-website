@@ -137,6 +137,18 @@ h1, h2, h3, legend {
   cursor: pointer;
 }
 
+.nav-right a {
+  background: none;
+  border: none;
+  color: #333;
+  text-decoration: none;
+  transition: color 0.3s;
+}
+
+.nav-right a:hover {
+  color: #555;
+}
+
 .nav-right button {
   background: none;
   border: none;
