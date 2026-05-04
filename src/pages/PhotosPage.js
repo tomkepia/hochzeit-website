@@ -422,24 +422,31 @@ export default function PhotosPage() {
         const readyArchives = plan.archives || [];
         const pendingJob = plan.pendingJob;
 
-        if (readyArchives.length > 0) {
-          startArchiveDownloads(readyArchives);
-        }
+        const archiveJobItems = readyArchives.map((a) => ({
+          jobId: a.jobId,
+          status: "ready",
+          photoCount: a.photoCount,
+          fileName: a.fileName,
+        }));
 
-        if (pendingJob) {
-          setDownloadJobs((prev) => [
-            pendingJob,
-            ...prev.filter((job) => job.jobId !== pendingJob.jobId),
-          ]);
+        const allNewJobs = pendingJob
+          ? [...archiveJobItems, pendingJob]
+          : archiveJobItems;
+
+        if (allNewJobs.length > 0) {
+          setDownloadJobs((prev) => {
+            const existingIds = new Set(allNewJobs.map((j) => j.jobId));
+            return [...allNewJobs, ...prev.filter((j) => !existingIds.has(j.jobId))];
+          });
         }
 
         if (readyArchives.length > 0 && pendingJob) {
-          showToast(`${readyArchives.length} ZIP(s) starten jetzt, der Rest wird vorbereitet`);
+          showToast(`${readyArchives.length} ZIP(s) bereit zum Herunterladen, der Rest wird vorbereitet`);
           return;
         }
 
         if (readyArchives.length > 0) {
-          showToast(`${readyArchives.length} ZIP(s) werden heruntergeladen`);
+          showToast(`${readyArchives.length} ZIP(s) bereit – unten auf Herunterladen klicken`);
           return;
         }
 
