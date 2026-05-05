@@ -17,6 +17,24 @@ function getAuthHeaders() {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+function getClientId() {
+  let clientId = localStorage.getItem("galleryClientId");
+  if (clientId) return clientId;
+
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    clientId = crypto.randomUUID();
+  } else {
+    clientId = `client-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  }
+
+  localStorage.setItem("galleryClientId", clientId);
+  return clientId;
+}
+
+function getDownloadJobHeaders() {
+  return { ...getAuthHeaders(), "X-Client-Id": getClientId() };
+}
+
 /** Handle a 401 by clearing session and redirecting to homepage. */
 function handle401() {
   localStorage.removeItem("galleryAccess");
@@ -411,7 +429,7 @@ export async function retryPhoto(photoId) {
 export async function createDownloadJob(photoIds, category = null) {
   const res = await fetch(`${API_BASE}/api/download-jobs`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+    headers: { "Content-Type": "application/json", ...getDownloadJobHeaders() },
     body: JSON.stringify({ photoIds, category }),
   });
 
@@ -434,7 +452,7 @@ export async function createDownloadJob(photoIds, category = null) {
  */
 export async function listDownloadJobs() {
   const res = await fetch(`${API_BASE}/api/download-jobs`, {
-    headers: { ...getAuthHeaders() },
+    headers: { ...getDownloadJobHeaders() },
   });
 
   if (res.status === 401) {
@@ -451,7 +469,7 @@ export async function listDownloadJobs() {
  */
 export async function getDownloadJob(jobId) {
   const res = await fetch(`${API_BASE}/api/download-jobs/${encodeURIComponent(jobId)}`, {
-    headers: { ...getAuthHeaders() },
+    headers: { ...getDownloadJobHeaders() },
   });
 
   if (res.status === 401) {
@@ -469,7 +487,7 @@ export async function getDownloadJob(jobId) {
  */
 export async function getDownloadJobUrl(jobId) {
   const res = await fetch(`${API_BASE}/api/download-jobs/${encodeURIComponent(jobId)}/url`, {
-    headers: { ...getAuthHeaders() },
+    headers: { ...getDownloadJobHeaders() },
   });
 
   if (res.status === 401) {
@@ -492,7 +510,7 @@ export async function getDownloadJobUrl(jobId) {
 export async function createDownloadAllPlan(category) {
   const res = await fetch(`${API_BASE}/api/download-jobs/download-all-plan`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+    headers: { "Content-Type": "application/json", ...getDownloadJobHeaders() },
     body: JSON.stringify({ category }),
   });
 

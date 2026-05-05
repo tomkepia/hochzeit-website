@@ -71,6 +71,9 @@ class DownloadJob(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     # Owner: hashed gallery token so jobs are scoped per-user without exposing the raw token.
     owner_key = Column(Text, nullable=False, index=True)
+    # Device/browser identifier for user-scoped jobs. NULL for shared archive jobs.
+    # Migration for existing databases: ALTER TABLE download_jobs ADD COLUMN client_id TEXT NULL;
+    client_id = Column(Text, nullable=True, index=True)
     # 'user' | 'archive_fixed' | 'archive_tail'
     job_kind = Column(String, nullable=False, default="user")
     # 'guest' | 'photographer' for archive jobs; nullable for user jobs.

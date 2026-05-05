@@ -53,6 +53,15 @@ def _extract_raw_token(request: Request) -> str:
     raise HTTPException(status_code=401, detail="Missing or malformed Authorization header")
 
 
+def _extract_client_id(request: Request) -> str:
+    client_id = (request.headers.get("X-Client-Id") or "").strip()
+    if not client_id:
+        raise HTTPException(status_code=400, detail="Missing X-Client-Id header")
+    if len(client_id) > 128:
+        raise HTTPException(status_code=400, detail="Invalid X-Client-Id header")
+    return client_id
+
+
 def _archive_label(category: str) -> str:
     return "gaestefotos" if category == "guest" else "fotografenfotos"
 
@@ -106,6 +115,7 @@ def _create_download_job(
     db: Session,
     *,
     owner_key: str,
+    client_id: str | None = None,
     photo_ids: list[str],
     job_kind: str = "user",
     category: str | None = None,
@@ -116,6 +126,7 @@ def _create_download_job(
     job = DownloadJob(
         id=uuid_lib.uuid4(),
         owner_key=owner_key,
+        client_id=client_id,
         job_kind=job_kind,
         category=category,
         segment_index=segment_index,
@@ -134,12 +145,14 @@ def _find_reusable_user_job(
     db: Session,
     *,
     owner_key: str,
+    client_id: str,
     category: str | None,
     photo_ids: list[str],
 ) -> DownloadJob | None:
     jobs = (
         db.query(DownloadJob)
         .filter(DownloadJob.owner_key == owner_key, DownloadJob.job_kind == "user")
+        .filter(DownloadJob.client_id == client_id)
         .filter(DownloadJob.category == category)
         .filter(DownloadJob.status.in_(["queued", "processing", "ready"]))
         .order_by(DownloadJob.created_at.desc())
@@ -236,6 +249,7 @@ def create_download_job(
 ):
     raw_token = _extract_raw_token(request)
     owner = _owner_key(raw_token)
+    client_id = _extract_client_id(request)
 
     photo_uuids = [uuid_lib.UUID(pid) for pid in payload.photoIds]
     photos = (
@@ -257,6 +271,7 @@ def create_download_job(
     reusable = _find_reusable_user_job(
         db,
         owner_key=owner,
+        client_id=client_id,
         category=payload.category,
         photo_ids=payload.photoIds,
     )
@@ -266,6 +281,7 @@ def create_download_job(
     job = _create_download_job(
         db,
         owner_key=owner,
+        client_id=client_id,
         photo_ids=payload.photoIds,
         category=payload.category,
         file_name=_file_name_for_job("user", payload.category, None, len(payload.photoIds)),
@@ -282,6 +298,7 @@ def create_download_all_plan(
 ):
     raw_token = _extract_raw_token(request)
     owner = _owner_key(raw_token)
+    client_id = _extract_client_id(request)
 
     photos = _ordered_done_photos(db, payload.category)
     ordered_ids = [str(photo.id) for photo in photos]
@@ -322,6 +339,7 @@ def create_download_all_plan(
             reusable = _find_reusable_user_job(
                 db,
                 owner_key=owner,
+                client_id=client_id,
                 category=payload.category,
                 photo_ids=remaining_ids,
             )
@@ -329,6 +347,7 @@ def create_download_all_plan(
                 reusable = _create_download_job(
                     db,
                     owner_key=owner,
+                    client_id=client_id,
                     photo_ids=remaining_ids,
                     category=payload.category,
                     file_name=_file_name_for_job("user", payload.category, None, len(remaining_ids)),
@@ -357,10 +376,12 @@ def list_download_jobs(
 ):
     raw_token = _extract_raw_token(request)
     owner = _owner_key(raw_token)
+    client_id = _extract_client_id(request)
 
     jobs = (
         db.query(DownloadJob)
         .filter(DownloadJob.owner_key == owner, DownloadJob.job_kind == "user")
+        .filter(DownloadJob.client_id == client_id)
         .order_by(DownloadJob.created_at.desc())
         .limit(MAX_JOBS_PER_LIST)
         .all()
@@ -376,6 +397,7 @@ def get_download_job(
 ):
     raw_token = _extract_raw_token(request)
     owner = _owner_key(raw_token)
+    client_id = _extract_client_id(request)
 
     try:
         job_uuid = uuid_lib.UUID(job_id)
@@ -383,7 +405,7 @@ def get_download_job(
         raise HTTPException(status_code=400, detail="Invalid job ID")
 
     job = db.query(DownloadJob).filter(DownloadJob.id == job_uuid).first()
-    if not job or job.owner_key != owner or job.job_kind != "user":
+    if not job or job.owner_key != owner or job.job_kind != "user" or job.client_id != client_id:
         raise HTTPException(status_code=404, detail="Job not found")
 
     return _job_dict(job)
@@ -397,6 +419,7 @@ def get_download_url(
 ):
     raw_token = _extract_raw_token(request)
     owner = _owner_key(raw_token)
+    client_id = _extract_client_id(request)
 
     try:
         job_uuid = uuid_lib.UUID(job_id)
@@ -404,7 +427,7 @@ def get_download_url(
         raise HTTPException(status_code=400, detail="Invalid job ID")
 
     job = db.query(DownloadJob).filter(DownloadJob.id == job_uuid).first()
-    if not job or job.owner_key != owner or job.job_kind != "user":
+    if not job or job.owner_key != owner or job.job_kind != "user" or job.client_id != client_id:
         raise HTTPException(status_code=404, detail="Job not found")
 
     if job.status != "ready":

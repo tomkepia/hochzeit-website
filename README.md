@@ -546,6 +546,8 @@ Stores metadata for uploaded photos. File data lives in S3.
 
 > **Migration note:** `taken_at` was added in Phase 8. Existing databases require: `ALTER TABLE photos ADD COLUMN taken_at TIMESTAMP NULL;`
 
+> **Migration note:** device-scoped async download jobs require: `ALTER TABLE download_jobs ADD COLUMN client_id TEXT NULL;`
+
 ---
 
 #### `access_tokens` table
