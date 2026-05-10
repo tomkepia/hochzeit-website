@@ -6,10 +6,14 @@ const ALLOWED_TYPES = new Set([
   "image/webp",
   "image/heic",
   "image/heif",
+  "video/mp4",
+  "video/quicktime",
+  "video/webm",
 ]);
 
 export const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB
 export const MAX_UPLOAD_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB
+export const MAX_VIDEO_UPLOAD_FILE_SIZE_BYTES = 250 * 1024 * 1024; // 250 MB
 
 /** Returns Authorization header object if a token is present in localStorage. */
 function getAuthHeaders() {
@@ -81,10 +85,15 @@ export async function passwordLogin(password) {
  */
 export function validateFile(file) {
   if (!ALLOWED_TYPES.has(file.type)) {
-    return `Unsupported file type: ${file.type || "unknown"}. Allowed: JPEG, PNG, WebP, HEIC.`;
+    return `Unsupported file type: ${file.type || "unknown"}. Allowed: JPEG, PNG, WebP, HEIC, MP4, MOV, WebM.`;
   }
-  if (file.size > MAX_UPLOAD_FILE_SIZE_BYTES) {
-    return `File too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximum is 50 MB.`;
+
+  const isVideo = (file.type || "").startsWith("video/");
+  const maxBytes = isVideo ? MAX_VIDEO_UPLOAD_FILE_SIZE_BYTES : MAX_UPLOAD_FILE_SIZE_BYTES;
+  const maxMb = Math.round(maxBytes / 1024 / 1024);
+
+  if (file.size > maxBytes) {
+    return `File too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximum is ${maxMb} MB.`;
   }
   return null;
 }

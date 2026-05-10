@@ -38,6 +38,9 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-hochzeit_db}
       ENVIRONMENT: production
       CORS_ORIGINS: ${CORS_ORIGINS:-https://yourdomain.com}
+      VIDEO_UPLOAD_ENABLED: ${VIDEO_UPLOAD_ENABLED:-true}
+      MAX_VIDEO_FILE_SIZE_BYTES: ${MAX_VIDEO_FILE_SIZE_BYTES:-262144000}
+      MAX_VIDEO_DURATION_SECONDS: ${MAX_VIDEO_DURATION_SECONDS:-180}
     networks:
       - app-network
     depends_on:
@@ -68,6 +71,9 @@ services:
       S3_SECRET_KEY: ${S3_SECRET_KEY}
       S3_BUCKET_NAME: ${S3_BUCKET_NAME}
       S3_REGION: ${S3_REGION:-eu-central}
+      VIDEO_UPLOAD_ENABLED: ${VIDEO_UPLOAD_ENABLED:-true}
+      MAX_VIDEO_FILE_SIZE_BYTES: ${MAX_VIDEO_FILE_SIZE_BYTES:-262144000}
+      MAX_VIDEO_DURATION_SECONDS: ${MAX_VIDEO_DURATION_SECONDS:-180}
     networks:
       - app-network
     depends_on:

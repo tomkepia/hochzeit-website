@@ -15,12 +15,19 @@ import "yet-another-react-lightbox/plugins/captions.css";
  *   onIndexChange  – called with new index when user swipes/navigates
  */
 export default function LightboxViewer({ photos, index, onClose, onIndexChange }) {
+  const extensionFromKey = (key) => {
+    if (!key) return "jpg";
+    const lastSegment = key.split("/").pop() || "";
+    if (!lastSegment.includes(".")) return "jpg";
+    return (lastSegment.split(".").pop() || "jpg").toLowerCase();
+  };
+
   const slides = photos.map((photo) => ({
     src: photo.previewUrl,
     // Download plugin: full-resolution original
     download: {
       url: photo.originalUrl,
-      filename: `hochzeit-${photo.id}.jpg`,
+      filename: `hochzeit-${photo.id}.${extensionFromKey(photo.originalKey)}`,
     },
     // Captions plugin: show uploader name if available
     description: photo.uploadedBy ? `Hochgeladen von ${photo.uploadedBy}` : undefined,

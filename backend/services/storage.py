@@ -13,6 +13,9 @@ ALLOWED_CONTENT_TYPES = {
     "image/webp",
     "image/heic",
     "image/heif",
+    "video/mp4",
+    "video/quicktime",
+    "video/webm",
 }
 
 UPLOAD_URL_EXPIRY = 600   # 10 minutes

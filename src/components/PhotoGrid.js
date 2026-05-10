@@ -44,6 +44,7 @@ export default function PhotoGrid({
     >
       {photos.map((photo, index) => {
         const isDone = !photo.processingStatus || photo.processingStatus === "done";
+        const isVideo = (photo.mediaType || "image") === "video";
         const selected = isDone && selectedPhotoIds.has(photo.id);
         const isRetrying = retryingPhotoIds.has(photo.id);
         const isProcessingLike = photo.processingStatus === "pending" || photo.processingStatus === "processing";
@@ -88,7 +89,7 @@ export default function PhotoGrid({
                 onPhotoClick(index);
               }
             }}
-            aria-label={photo.uploadedBy ? `Foto von ${photo.uploadedBy}` : "Hochzeitsfoto öffnen"}
+            aria-label={photo.uploadedBy ? `${isVideo ? "Video" : "Foto"} von ${photo.uploadedBy}` : `Hochzeits${isVideo ? "video" : "foto"} öffnen`}
             aria-pressed={selectionMode && isDone ? selected : undefined}
             style={{
               padding: 0,
@@ -107,7 +108,7 @@ export default function PhotoGrid({
             {photo.thumbnailUrl ? (
               <img
                 src={photo.thumbnailUrl}
-                alt={photo.uploadedBy ? `Foto von ${photo.uploadedBy}` : "Hochzeitsfoto"}
+                alt={photo.uploadedBy ? `${isVideo ? "Video" : "Foto"} von ${photo.uploadedBy}` : `Hochzeits${isVideo ? "video" : "foto"}`}
                 loading="lazy"
                 style={{
                   width: "100%",
@@ -122,6 +123,27 @@ export default function PhotoGrid({
               />
             ) : (
               <div style={{ width: "100%", height: "100%", background: "#e0d8cf" }} />
+            )}
+
+            {isVideo && isDone && (
+              <div
+                style={{
+                  position: "absolute",
+                  left: 8,
+                  bottom: 8,
+                  background: "rgba(0,0,0,0.66)",
+                  color: "#fff",
+                  borderRadius: 999,
+                  padding: "4px 8px",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                }}
+              >
+                ▶ Video
+              </div>
             )}
 
             {/* Processing state overlays */}

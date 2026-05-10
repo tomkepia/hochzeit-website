@@ -22,6 +22,13 @@ class Photo(Base):
     thumbnail_key = Column(Text) # set by Phase 3 after processing
     thumbnail_url = Column(Text)
     category = Column(String, nullable=False)  # "guest" | "photographer"
+    # Media type discriminator. Existing rows default to image.
+    media_type = Column(String, nullable=False, default="image", server_default="image")
+    mime_type = Column(String, nullable=True)
+    file_size_bytes = Column(Integer, nullable=True)
+    duration_seconds = Column(Integer, nullable=True)
+    width = Column(Integer, nullable=True)
+    height = Column(Integer, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
     # EXIF capture timestamp; nullable for backward compatibility with old rows.
     taken_at = Column(DateTime, nullable=True)

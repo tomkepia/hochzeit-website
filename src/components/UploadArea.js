@@ -43,6 +43,10 @@ function detectTransparency(ctx, width, height) {
  * Returns an ISO-8601 string or null.
  */
 async function extractTakenAt(file) {
+  if (!(file.type || "").startsWith("image/")) {
+    return null;
+  }
+
   try {
     const result = await parseExif(file, ["DateTimeOriginal", "DateTime"]);
     if (!result) return null;
@@ -283,17 +287,17 @@ export default function UploadArea({ category = "guest", uploaderName = "" }) {
         role="button"
         tabIndex={0}
         onKeyDown={(e) => e.key === "Enter" && fileInputRef.current?.click()}
-        aria-label="Bilder auswählen oder hier ablegen"
+        aria-label="Fotos oder Videos auswählen oder hier ablegen"
       >
         <span style={styles.dropIcon}>📷</span>
         <p style={styles.dropText}>
-          Bilder hier ablegen oder <u>auswählen</u>
+          Fotos und Videos hier ablegen oder <u>auswählen</u>
         </p>
-        <p style={styles.dropHint}>JPEG, PNG, WebP, HEIC · max. 20 MB pro Datei</p>
+        <p style={styles.dropHint}>JPEG, PNG, WebP, HEIC, MP4, MOV, WebM · Fotos bis 50 MB, Videos bis 250 MB</p>
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+          accept="image/jpeg,image/png,image/webp,image/heic,image/heif,video/mp4,video/quicktime,video/webm"
           multiple
           style={{ display: "none" }}
           onChange={handleFileInput}
@@ -322,9 +326,9 @@ export default function UploadArea({ category = "guest", uploaderName = "" }) {
         <div style={styles.actions}>
           {allDone ? (
             <div style={{ textAlign: "center" }}>
-              <p style={styles.successMessage}>✓ Alle Fotos wurden hochgeladen!</p>
+              <p style={styles.successMessage}>✓ Alle Dateien wurden hochgeladen!</p>
               <p style={styles.processingHint}>
-                ⏳ Es kann einen kurzen Moment dauern, bis die Bilder in der Galerie erscheinen.
+                ⏳ Es kann einen kurzen Moment dauern, bis die Medien in der Galerie erscheinen.
               </p>
             </div>
           ) : (
@@ -336,7 +340,7 @@ export default function UploadArea({ category = "guest", uploaderName = "" }) {
               >
                 {activeUploads > 0
                   ? "Wird hochgeladen…"
-                  : `${fileEntries.filter((e) => e.status === "queued").length} Foto(s) hochladen`}
+                  : `${fileEntries.filter((e) => e.status === "queued").length} Datei(en) hochladen`}
               </button>
               <button
                 style={styles.clearBtn}

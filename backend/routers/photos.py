@@ -2,6 +2,7 @@ import logging
 import uuid as uuid_lib
 from datetime import datetime
 from collections.abc import Iterator
+import os
 
 import requests
 import zipstream
@@ -22,6 +23,14 @@ logger = logging.getLogger(__name__)
 
 ALLOWED_CATEGORIES = {"guest", "photographer"}
 MAX_REGISTER_UPLOAD_SIZE_BYTES = 50 * 1024 * 1024
+MAX_REGISTER_VIDEO_SIZE_BYTES = int(os.getenv("MAX_VIDEO_FILE_SIZE_BYTES", str(250 * 1024 * 1024)))
+VIDEO_UPLOAD_ENABLED = os.getenv("VIDEO_UPLOAD_ENABLED", "true").lower() == "true"
+
+
+def _media_type_from_content_type(content_type: str) -> str:
+    if content_type.startswith("video/"):
+        return "video"
+    return "image"
 
 
 def get_db():
@@ -96,12 +105,19 @@ def register_photo(
     content_length = int(metadata.get("ContentLength", 0) or 0)
     if content_length <= 0:
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
-    if content_length > MAX_REGISTER_UPLOAD_SIZE_BYTES:
-        raise HTTPException(status_code=400, detail="File too large (max. 50 MB).")
 
     raw_content_type = (metadata.get("ContentType") or "").split(";", 1)[0].strip().lower()
     if raw_content_type not in storage.ALLOWED_CONTENT_TYPES:
         raise HTTPException(status_code=400, detail="Invalid uploaded file type.")
+
+    media_type = _media_type_from_content_type(raw_content_type)
+    if media_type == "video" and not VIDEO_UPLOAD_ENABLED:
+        raise HTTPException(status_code=403, detail="Video uploads are currently disabled.")
+
+    max_bytes = MAX_REGISTER_VIDEO_SIZE_BYTES if media_type == "video" else MAX_REGISTER_UPLOAD_SIZE_BYTES
+    max_mb = round(max_bytes / 1024 / 1024)
+    if content_length > max_bytes:
+        raise HTTPException(status_code=400, detail=f"File too large (max. {max_mb} MB).")
 
     # Parse client-provided EXIF timestamp (ISO-8601). Validated loosely —
     # if it's malformed we simply ignore it; the worker may fill it later.
@@ -123,6 +139,9 @@ def register_photo(
         preview_url=None,
         thumbnail_url=None,
         category=effective_category,
+        media_type=media_type,
+        mime_type=raw_content_type,
+        file_size_bytes=content_length,
         uploaded_by=request.uploadedBy,
         processing_status="pending",
         taken_at=client_taken_at,
@@ -434,12 +453,19 @@ def list_photos(
         result.append({
             "id": str(photo.id),
             "category": photo.category,
+            "mediaType": photo.media_type or "image",
+            "mimeType": photo.mime_type,
+            "fileSizeBytes": photo.file_size_bytes,
+            "durationSeconds": photo.duration_seconds,
+            "width": photo.width,
+            "height": photo.height,
             "uploadedBy": photo.uploaded_by,
             "createdAt": photo.created_at.isoformat() if photo.created_at else None,
             "takenAt": photo.taken_at.isoformat() if photo.taken_at else None,
             "thumbnailUrl": thumbnail_url,
             "previewUrl": preview_url,
             "originalUrl": original_url,
+            "originalKey": photo.original_key,
             "processingStatus": photo.processing_status,
             "processingError": photo.processing_error,
             "processingAttempts": photo.processing_attempts,

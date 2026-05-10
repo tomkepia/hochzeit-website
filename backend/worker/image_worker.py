@@ -66,6 +66,7 @@ from database import SessionLocal
 from models import DownloadJob, Photo
 from services import storage
 from services.image_processing import process_photo_safe
+from services.video_processing import process_video_safe
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -463,7 +464,11 @@ def _handle_photo(db, photo: Photo) -> None:
     )
 
     try:
-        process_photo_safe(photo_id)
+        media_type = (photo.media_type or "image").lower()
+        if media_type == "video":
+            process_video_safe(photo_id)
+        else:
+            process_photo_safe(photo_id)
 
         # Re-read: process_photo_safe committed variant keys in its own session.
         photo = db.query(Photo).filter(Photo.id == photo.id).first()

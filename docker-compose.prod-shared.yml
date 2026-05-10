@@ -44,6 +44,9 @@ services:
       S3_BUCKET_NAME: ${S3_BUCKET_NAME}
       S3_REGION: ${S3_REGION:-eu-central}
       GALLERY_PASSWORD: ${GALLERY_PASSWORD}
+      VIDEO_UPLOAD_ENABLED: ${VIDEO_UPLOAD_ENABLED:-true}
+      MAX_VIDEO_FILE_SIZE_BYTES: ${MAX_VIDEO_FILE_SIZE_BYTES:-262144000}
+      MAX_VIDEO_DURATION_SECONDS: ${MAX_VIDEO_DURATION_SECONDS:-180}
     networks:
       - hochzeit-network
     ports:
@@ -75,6 +78,9 @@ services:
       S3_BUCKET_NAME: ${S3_BUCKET_NAME}
       S3_REGION: ${S3_REGION:-eu-central}
       LOG_LEVEL: ${WORKER_LOG_LEVEL:-INFO}
+      VIDEO_UPLOAD_ENABLED: ${VIDEO_UPLOAD_ENABLED:-true}
+      MAX_VIDEO_FILE_SIZE_BYTES: ${MAX_VIDEO_FILE_SIZE_BYTES:-262144000}
+      MAX_VIDEO_DURATION_SECONDS: ${MAX_VIDEO_DURATION_SECONDS:-180}
     command: python -m worker.image_worker
     networks:
       - hochzeit-network

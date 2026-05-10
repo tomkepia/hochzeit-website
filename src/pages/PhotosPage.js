@@ -53,6 +53,7 @@ export default function PhotosPage() {
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState(null);
   const [lightboxIndex, setLightboxIndex] = useState(-1);
+  const [videoModalPhoto, setVideoModalPhoto] = useState(null);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedPhotoIds, setSelectedPhotoIds] = useState(() => new Set());
   const [downloadStatus, setDownloadStatus] = useState(null);
@@ -174,10 +175,16 @@ export default function PhotosPage() {
     }
   }, [category, photos.length, sortMode, uploadedBy]);
 
-  // Photos that have finished processing — used to drive the lightbox.
-  const donePhotos = useMemo(
+  // Media that have finished processing.
+  const doneMedia = useMemo(
     () => photos.filter((p) => !p.processingStatus || p.processingStatus === "done"),
     [photos]
+  );
+
+  // Lightbox remains image-only. Videos use a dedicated modal player.
+  const donePhotos = useMemo(
+    () => doneMedia.filter((p) => (p.mediaType || "image") !== "video"),
+    [doneMedia]
   );
 
   const hasNonDonePhotos = useMemo(
@@ -195,6 +202,10 @@ export default function PhotosPage() {
     (gridIndex) => {
       const photo = photos[gridIndex];
       if (!photo) return;
+      if ((photo.mediaType || "image") === "video") {
+        setVideoModalPhoto(photo);
+        return;
+      }
       const lbIndex = donePhotos.findIndex((p) => p.id === photo.id);
       if (lbIndex >= 0) setLightboxIndex(lbIndex);
     },
@@ -706,7 +717,7 @@ export default function PhotosPage() {
             Unsere Fotos
           </h1>
           <p style={{ color: "#9b8a7a", fontSize: 14, opacity: 0.8, margin: "0 0 16px" }}>
-            Klicke auf ein Foto, um es zu öffnen.
+            Klicke auf ein Foto oder Video, um es zu öffnen.
           </p>
         </div>
 
@@ -1310,6 +1321,65 @@ export default function PhotosPage() {
           onClose={() => setLightboxIndex(-1)}
           onIndexChange={setLightboxIndex}
         />
+      )}
+
+      {videoModalPhoto && !selectionMode && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.9)",
+            zIndex: 60,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+          }}
+          onClick={() => setVideoModalPhoto(null)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            style={{
+              width: "min(1100px, 100%)",
+              maxHeight: "100%",
+              position: "relative",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setVideoModalPhoto(null)}
+              aria-label="Video schließen"
+              style={{
+                position: "absolute",
+                right: 0,
+                top: -44,
+                border: "none",
+                background: "transparent",
+                color: "#fff",
+                fontSize: 34,
+                cursor: "pointer",
+                lineHeight: 1,
+              }}
+            >
+              ×
+            </button>
+
+            <video
+              src={videoModalPhoto.originalUrl}
+              poster={videoModalPhoto.thumbnailUrl || undefined}
+              controls
+              autoPlay
+              playsInline
+              style={{
+                width: "100%",
+                maxHeight: "82vh",
+                background: "#000",
+                borderRadius: 8,
+              }}
+            />
+          </div>
+        </div>
       )}
     </div>
   );

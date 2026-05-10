@@ -47,7 +47,7 @@ export default function UploadPage() {
       </div>
 
       <div style={styles.header}>
-        <h1 style={styles.title}>Fotos hochladen</h1>
+        <h1 style={styles.title}>Fotos und Videos hochladen</h1>
         <p style={styles.subtitle}>
           Teile deine Erinnerungen – wir freuen uns über jeden Moment!
         </p>
@@ -67,7 +67,7 @@ export default function UploadPage() {
           maxLength={80}
         />
         <p style={styles.nameHint}>
-          💡 Mit deinem Namen können Gäste in der Galerie gezielt nach deinen Fotos filtern.
+          💡 Mit deinem Namen können Gäste in der Galerie gezielt nach deinen Medien filtern.
         </p>
       </div>
 

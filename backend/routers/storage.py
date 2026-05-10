@@ -1,5 +1,6 @@
 import uuid
 import logging
+import os
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -17,8 +18,13 @@ ALLOWED_CONTENT_TYPES = {
     "image/webp",
     "image/heic",
     "image/heif",
+    "video/mp4",
+    "video/quicktime",
+    "video/webm",
 }
-MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024
+MAX_IMAGE_FILE_SIZE_BYTES = 50 * 1024 * 1024
+MAX_VIDEO_FILE_SIZE_BYTES = int(os.getenv("MAX_VIDEO_FILE_SIZE_BYTES", str(250 * 1024 * 1024)))
+VIDEO_UPLOAD_ENABLED = os.getenv("VIDEO_UPLOAD_ENABLED", "true").lower() == "true"
 
 # Maps MIME type → canonical file extension for original uploads
 CONTENT_TYPE_EXTENSIONS = {
@@ -27,6 +33,9 @@ CONTENT_TYPE_EXTENSIONS = {
     "image/webp": "webp",
     "image/heic": "heic",
     "image/heif": "heif",
+    "video/mp4": "mp4",
+    "video/quicktime": "mov",
+    "video/webm": "webm",
 }
 
 ALLOWED_CATEGORIES = {"guest", "photographer"}
@@ -39,6 +48,10 @@ class UploadUrlRequest(BaseModel):
     fileSize: int | None = None
 
 
+def _is_video_content_type(content_type: str) -> bool:
+    return content_type.startswith("video/")
+
+
 @router.post("/upload-url", dependencies=[Depends(require_gallery_access())])
 def get_upload_url(request: UploadUrlRequest):
     """Generate a pre-signed PUT URL so the client can upload directly to S3."""
@@ -48,6 +61,9 @@ def get_upload_url(request: UploadUrlRequest):
             detail=f"Unsupported content type '{request.contentType}'. "
                    f"Allowed: {sorted(ALLOWED_CONTENT_TYPES)}",
         )
+
+    if _is_video_content_type(request.contentType) and not VIDEO_UPLOAD_ENABLED:
+        raise HTTPException(status_code=403, detail="Video uploads are currently disabled")
 
     if request.category not in ALLOWED_CATEGORIES:
         raise HTTPException(
@@ -59,8 +75,10 @@ def get_upload_url(request: UploadUrlRequest):
     if request.fileSize is not None:
         if request.fileSize < 0:
             raise HTTPException(status_code=400, detail="Invalid file size")
-        if request.fileSize > MAX_FILE_SIZE_BYTES:
-            raise HTTPException(status_code=400, detail="File too large (max. 50 MB)")
+        max_bytes = MAX_VIDEO_FILE_SIZE_BYTES if _is_video_content_type(request.contentType) else MAX_IMAGE_FILE_SIZE_BYTES
+        max_mb = round(max_bytes / 1024 / 1024)
+        if request.fileSize > max_bytes:
+            raise HTTPException(status_code=400, detail=f"File too large (max. {max_mb} MB)")
 
     photo_uuid = str(uuid.uuid4())
     extension = CONTENT_TYPE_EXTENSIONS[request.contentType]
